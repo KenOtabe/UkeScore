@@ -168,6 +168,29 @@ body {
 .song-item.active { background: rgba(91,124,246,.15); border: 1px solid rgba(91,124,246,.3); }
 .song-item .si-title { font-size: 0.88rem; font-weight: 500; }
 .song-item .si-sub   { font-size: 0.72rem; color: var(--muted); margin-top: 1px; }
+.song-item-del {
+  background: none; border: none; color: var(--muted);
+  font-size: 0.78rem; cursor: pointer; padding: 2px 5px;
+  border-radius: 4px; flex-shrink: 0; line-height: 1;
+  transition: all 0.1s;
+}
+.song-item-del:active { color: var(--danger); background: rgba(246,91,91,.1); }
+.song-item-inner { display: flex; align-items: center; gap: 4px; }
+.song-item-text  { flex: 1; min-width: 0; }
+/* Custom dialog */
+.uke-dialog-overlay {
+  position: fixed; inset: 0; background: rgba(0,0,0,.7);
+  z-index: 500; display: flex; align-items: center; justify-content: center;
+  padding: 20px; backdrop-filter: blur(4px);
+}
+.uke-dialog-overlay.hidden { display: none; }
+.uke-dialog {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 14px; width: min(320px,100%);
+  box-shadow: 0 16px 48px rgba(0,0,0,.5);
+}
+.uke-dialog-body { padding: 20px 20px 14px; font-size: 0.9rem; line-height: 1.6; }
+.uke-dialog-ftr  { padding: 10px 16px 14px; display: flex; gap: 8px; justify-content: flex-end; }
 .sidebar-footer { padding: 10px; border-top: 1px solid var(--border); }
 
 /* Score area */
@@ -643,6 +666,14 @@ body {
   </div>
 </div>
 
+<!-- Custom confirm dialog -->
+<div class="uke-dialog-overlay hidden" id="ukeDialog">
+  <div class="uke-dialog">
+    <div class="uke-dialog-body" id="ukeDialogMsg"></div>
+    <div class="uke-dialog-ftr" id="ukeDialogFtr"></div>
+  </div>
+</div>
+
 <script>
 'use strict';
 
@@ -810,10 +841,56 @@ function renderSongList() {
     return;
   }
   el.innerHTML = songs.map((s,i) => `
-    <div class="song-item ${i===currentIdx?'active':''}" onclick="loadSong(${i})">
-      <div class="si-title">${s.title}</div>
-      <div class="si-sub">${s.subtitle||''}</div>
+    <div class="song-item ${i===currentIdx?'active':''}">
+      <div class="song-item-inner">
+        <div class="song-item-text" onclick="loadSong(${i})">
+          <div class="si-title">${s.title}</div>
+          <div class="si-sub">${s.subtitle||''}</div>
+        </div>
+        <button class="song-item-del" onclick="confirmDeleteSong(${i})" title="削除">🗑</button>
+      </div>
     </div>`).join('');
+}
+
+/* ── Custom dialog ── */
+function ukeConfirm(msg, onOk) {
+  document.getElementById('ukeDialogMsg').innerHTML = msg;
+  const ftr = document.getElementById('ukeDialogFtr');
+  ftr.innerHTML = '';
+  const btnCancel = document.createElement('button');
+  btnCancel.className = 'btn btn-secondary btn-sm';
+  btnCancel.textContent = 'キャンセル';
+  btnCancel.onclick = () => document.getElementById('ukeDialog').classList.add('hidden');
+  const btnOk = document.createElement('button');
+  btnOk.className = 'btn btn-sm';
+  btnOk.style.cssText = 'background:var(--danger);color:#fff';
+  btnOk.textContent = '削除';
+  btnOk.onclick = () => { document.getElementById('ukeDialog').classList.add('hidden'); onOk(); };
+  ftr.appendChild(btnCancel);
+  ftr.appendChild(btnOk);
+  document.getElementById('ukeDialog').classList.remove('hidden');
+}
+
+/* ── Delete song ── */
+function confirmDeleteSong(idx) {
+  const title = songs[idx]?.title || '無題';
+  ukeConfirm(`「${title}」を削除しますか？`, () => deleteSong(idx));
+}
+
+function deleteSong(idx) {
+  songs.splice(idx, 1);
+  save();
+  if (currentIdx === idx) {
+    currentIdx = songs.length > 0 ? Math.min(idx, songs.length - 1) : -1;
+    if (currentIdx >= 0) { renderSong(); }
+    else {
+      document.getElementById('emptyState').style.display = 'flex';
+      document.getElementById('songContent').style.display = 'none';
+    }
+  } else if (currentIdx > idx) {
+    currentIdx--;
+  }
+  renderSongList();
 }
 
 function loadSong(idx) {
