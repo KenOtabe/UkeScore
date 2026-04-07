@@ -1,0 +1,1468 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>🎸 UkeScore</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&family=Caveat:wght@500;700&family=JetBrains+Mono:wght@400;600&display=swap');
+
+/*
+  データ構造（v2）:
+  line = { chars: ["ひ","ま","わ",...], chords: {"0":"G", "5":"D"} }
+  chords のキー = chars の index（文字単位）
+  位置調整 = chords のキーを ±1 移動するだけ
+*/
+
+:root {
+  --bg: #0f1117;
+  --surface: #1a1d27;
+  --surface2: #222636;
+  --border: #2e3248;
+  --accent: #5b7cf6;
+  --accent2: #f6a05b;
+  --chord-color: #f6a05b;
+  --lyric-color: #e8eaf6;
+  --muted: #7880a0;
+  --danger: #f65b5b;
+  --tab-color: #5bf6b0;
+  --font-jp: 'Noto Sans JP', sans-serif;
+  --font-hand: 'Caveat', cursive;
+  --font-mono: 'JetBrains Mono', monospace;
+  --char-w: 1.15rem;   /* fixed width per character cell */
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+
+body {
+  font-family: var(--font-jp);
+  background: var(--bg);
+  color: var(--lyric-color);
+  height: 100dvh;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ── TOPBAR ── */
+.topbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+  flex-wrap: wrap;
+}
+.app-logo {
+  font-family: var(--font-hand);
+  font-size: 1.35rem;
+  font-weight: 700;
+  color: var(--accent);
+  flex-shrink: 0;
+}
+.topbar-spacer { flex: 1; min-width: 8px; }
+.btn {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 7px 12px; border-radius: 8px; border: none;
+  font-family: var(--font-jp); font-size: 0.8rem; font-weight: 500;
+  cursor: pointer; transition: all 0.15s; white-space: nowrap;
+}
+.btn-primary  { background: var(--accent); color: #fff; }
+.btn-primary:hover  { background: #7090ff; }
+.btn-secondary{ background: var(--surface2); color: var(--lyric-color); border: 1px solid var(--border); }
+.btn-secondary:hover{ background: var(--border); }
+.btn-warn     { background: var(--accent2); color: #1a1000; }
+.btn-warn:hover     { background: #ffb570; }
+.btn-sm { padding: 5px 9px; font-size: 0.76rem; }
+.btn-icon {
+  padding: 7px; border-radius: 8px;
+  background: var(--surface2); border: 1px solid var(--border);
+  cursor: pointer; color: var(--muted); transition: all 0.15s;
+}
+.btn-icon:hover { color: var(--lyric-color); background: var(--border); }
+
+.toggle-group {
+  display: flex;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 8px; overflow: hidden;
+}
+.toggle-group button {
+  padding: 6px 11px; border: none; background: transparent;
+  color: var(--muted); font-family: var(--font-jp); font-size: 0.78rem;
+  cursor: pointer; transition: all 0.15s;
+}
+.toggle-group button.active { background: var(--accent); color: #fff; }
+
+/* ── LAYOUT ── */
+.main { display: flex; flex: 1; overflow: hidden; position: relative; }
+
+/* ── SIDEBAR ── */
+/* Wrapper holds both the panel and the collapsed tab */
+.sidebar-wrap {
+  display: flex; flex-shrink: 0;
+  position: relative; transition: width 0.24s cubic-bezier(.4,0,.2,1);
+  width: 260px;
+}
+.sidebar-wrap.collapsed { width: 32px; }
+
+/* The actual panel */
+.sidebar {
+  width: 260px; background: var(--surface);
+  border-right: 1px solid var(--border);
+  display: flex; flex-direction: column;
+  overflow: hidden;
+  transition: transform 0.24s cubic-bezier(.4,0,.2,1),
+              opacity   0.18s ease;
+  flex-shrink: 0;
+  transform: translateX(0); opacity: 1;
+}
+.sidebar-wrap.collapsed .sidebar {
+  transform: translateX(-260px); opacity: 0; pointer-events: none;
+}
+
+/* Collapsed tab — thin strip shown when sidebar is hidden */
+.sidebar-tab {
+  display: none;
+  position: absolute; left: 0; top: 0; bottom: 0; width: 32px;
+  background: var(--surface); border-right: 1px solid var(--border);
+  align-items: center; justify-content: center;
+  cursor: pointer; flex-direction: column; gap: 6px;
+  transition: background 0.12s;
+}
+.sidebar-tab:hover { background: var(--surface2); }
+.sidebar-wrap.collapsed .sidebar-tab { display: flex; }
+
+/* Rotated label in the tab */
+.sidebar-tab-label {
+  writing-mode: vertical-rl;
+  text-orientation: mixed;
+  font-size: 0.68rem; font-weight: 700;
+  color: var(--muted); letter-spacing: 0.12em;
+  text-transform: uppercase;
+  user-select: none;
+}
+.sidebar-tab-icon { font-size: 0.9rem; color: var(--muted); }
+
+.sidebar-header {
+  padding: 12px 14px; border-bottom: 1px solid var(--border);
+  font-size: 0.75rem; font-weight: 700; color: var(--muted);
+  letter-spacing: 0.1em; text-transform: uppercase;
+  display: flex; align-items: center; justify-content: space-between;
+}
+.sidebar-close {
+  background: none; border: none; color: var(--muted);
+  cursor: pointer; font-size: 1rem; line-height: 1; padding: 2px 4px;
+  border-radius: 4px; transition: color 0.12s, background 0.12s;
+}
+.sidebar-close:hover { color: var(--lyric-color); background: var(--border); }
+
+.song-list { flex: 1; overflow-y: auto; padding: 6px; }
+.song-item {
+  padding: 9px 11px; border-radius: 8px; cursor: pointer;
+  transition: background 0.12s; margin-bottom: 2px;
+}
+.song-item:hover { background: var(--surface2); }
+.song-item.active { background: rgba(91,124,246,.15); border: 1px solid rgba(91,124,246,.3); }
+.song-item .si-title { font-size: 0.88rem; font-weight: 500; }
+.song-item .si-sub   { font-size: 0.72rem; color: var(--muted); margin-top: 1px; }
+.sidebar-footer { padding: 10px; border-top: 1px solid var(--border); }
+
+/* Score area */
+.score-area { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+
+.song-header {
+  padding: 14px 22px 10px; border-bottom: 1px solid var(--border);
+  background: var(--surface); flex-shrink: 0;
+}
+.song-title-display { font-family: var(--font-hand); font-size: 1.55rem; font-weight: 700; }
+.song-sub-display   { font-size: 0.82rem; color: var(--muted); margin-top: 2px; }
+
+/* Chord reference bar */
+.chord-bar {
+  padding: 8px 22px; background: var(--surface2);
+  border-bottom: 1px solid var(--border);
+  display: flex; gap: 10px; overflow-x: auto; flex-shrink: 0;
+  align-items: flex-start;
+}
+.chord-bar::-webkit-scrollbar { height: 3px; }
+.chord-bar::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+.cref {
+  flex-shrink: 0; text-align: center; padding: 5px 7px;
+  border-radius: 7px; border: 1px solid transparent; transition: all 0.12s;
+  cursor: default;
+}
+.cref:hover { background: var(--surface); border-color: var(--border); }
+.cref-name {
+  font-family: var(--font-hand); font-size: 0.95rem; font-weight: 700;
+  color: var(--chord-color); margin-bottom: 3px;
+}
+.cref-tab {
+  font-family: var(--font-mono); font-size: 0.63rem; line-height: 1.5;
+  color: var(--tab-color); background: rgba(91,246,176,.05);
+  padding: 2px 4px; border-radius: 3px; text-align: left;
+  white-space: pre; display: none;
+}
+.cref-tab.show { display: block; }
+
+/* ── SCORE SCROLL ── */
+.score-scroll { flex: 1; overflow-y: auto; padding: 22px 24px 60px; }
+.score-scroll::-webkit-scrollbar { width: 5px; }
+.score-scroll::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+/* Section */
+.sec-block { margin-bottom: 24px; }
+.sec-label {
+  display: inline-block;
+  font-size: 0.68rem; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase;
+  color: var(--accent); background: rgba(91,124,246,.12);
+  padding: 2px 9px; border-radius: 20px; margin-bottom: 10px;
+  border: 1px solid rgba(91,124,246,.25);
+}
+
+/* ── LINE ──
+   Each line = flex row of .char-cell elements.
+   Each char-cell is a fixed-width column holding:
+     [chord area on top]  ← variable height depending on display mode
+     [char on bottom]
+*/
+.lyric-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;   /* anchor everything to the text baseline */
+  margin-bottom: 10px;
+  /* No fixed min-height; height grows naturally from chord area */
+}
+
+/* ── CHAR CELL ── */
+.char-cell {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  /* width is driven by the character; chord overflows freely above */
+  position: relative;
+  cursor: default;
+}
+
+/* chord area: sits above the character */
+.chord-area {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  min-height: 0;           /* collapses when empty */
+  /* a small bottom gap ensures chord never touches char */
+  padding-bottom: 3px;
+}
+.chord-area:empty { display: none; }
+
+/* chord name label */
+.chord-name {
+  font-family: var(--font-hand);
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--chord-color);
+  white-space: nowrap;
+  line-height: 1;
+}
+
+/* vertical tab block */
+.tab-v {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  font-weight: 700;
+  line-height: 1.45;
+  color: var(--tab-color);
+  background: rgba(91,246,176,.07);
+  border: 1px solid rgba(91,246,176,.2);
+  border-radius: 4px;
+  padding: 2px 5px;
+  white-space: nowrap;
+  /* gap below so it never bleeds into the char row */
+  margin-bottom: 4px;
+}
+
+/* char label */
+.char-label {
+  font-size: 1.1rem;
+  line-height: 1.4;
+  color: var(--lyric-color);
+  white-space: pre;        /* preserve spaces */
+  min-width: 0.55rem;      /* narrow chars still get a column */
+}
+
+/* ── EDIT MODE styles ── */
+.char-cell.edit-mode {
+  cursor: pointer;
+  border-radius: 3px;
+  transition: background 0.1s;
+}
+.char-cell.edit-mode:hover { background: rgba(246,160,91,.1); }
+.char-cell.edit-mode.has-chord:hover .pos-ctrl { display: flex; }
+/* highlight active chord cell */
+.char-cell.chord-active { background: rgba(91,124,246,.15); border-radius: 3px; }
+
+/* ── POSITION CONTROLS ──
+   Float above the chord-area of a cell that already has a chord.
+   Only visible in edit mode on hover.
+*/
+.pos-ctrl {
+  display: none;
+  position: absolute;
+  top: -22px; left: 50%; transform: translateX(-50%);
+  align-items: center; gap: 2px;
+  background: var(--surface2); border: 1px solid var(--border);
+  border-radius: 6px; padding: 1px 4px;
+  white-space: nowrap; z-index: 20;
+}
+.pos-btn {
+  background: none; border: none; color: var(--muted);
+  font-size: 0.72rem; cursor: pointer; padding: 1px 5px;
+  border-radius: 3px; line-height: 1;
+  transition: background 0.1s, color 0.1s;
+}
+.pos-btn:hover { background: var(--border); color: var(--lyric-color); }
+
+/* ── CHORD EDIT POPUP ── */
+.chord-popup {
+  position: fixed; z-index: 300;
+  background: var(--surface); border: 1px solid var(--accent);
+  border-radius: 10px; padding: 10px 12px;
+  box-shadow: 0 8px 28px rgba(0,0,0,.5);
+  display: none;
+}
+.chord-popup.show { display: flex; flex-direction: column; gap: 6px; }
+.chord-popup input {
+  font-family: var(--font-hand); font-size: 1.1rem; font-weight: 700;
+  color: var(--chord-color); background: rgba(91,124,246,.12);
+  border: 1px solid var(--accent); border-radius: 5px;
+  outline: none; width: 80px; padding: 3px 6px;
+}
+.chord-popup-hint { font-size: 0.7rem; color: var(--muted); }
+.chord-popup-actions { display: flex; gap: 6px; }
+
+/* ── CONTEXT MENU ── */
+.ctx-menu {
+  position: fixed; background: var(--surface);
+  border: 1px solid var(--border); border-radius: 10px;
+  padding: 5px; z-index: 300; min-width: 150px;
+  box-shadow: 0 8px 24px rgba(0,0,0,.4); display: none;
+}
+.ctx-menu.show { display: block; }
+.ctx-item {
+  padding: 7px 11px; border-radius: 5px; cursor: pointer;
+  font-size: 0.83rem; display: flex; align-items: center; gap: 7px;
+  color: var(--lyric-color); transition: background 0.1s;
+}
+.ctx-item:hover { background: var(--surface2); }
+.ctx-item.danger { color: var(--danger); }
+.ctx-div { height: 1px; background: var(--border); margin: 3px 0; }
+
+/* ── EDIT TOOLBAR ── */
+.edit-bar {
+  display: none; position: fixed; bottom: 18px; left: 50%;
+  transform: translateX(-50%);
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 40px; padding: 7px 16px;
+  gap: 10px; align-items: center; z-index: 150;
+  box-shadow: 0 6px 28px rgba(0,0,0,.45);
+  font-size: 0.8rem; color: var(--muted); white-space: nowrap;
+}
+.edit-bar.show { display: flex; }
+.edit-bar kbd {
+  background: var(--surface2); border: 1px solid var(--border);
+  border-radius: 3px; padding: 1px 5px;
+  font-family: var(--font-mono); font-size: 0.72rem; color: var(--lyric-color);
+}
+
+/* ── MODALS ── */
+.modal-overlay {
+  position: fixed; inset: 0; background: rgba(0,0,0,.72);
+  z-index: 200; display: flex; align-items: center; justify-content: center;
+  padding: 18px; backdrop-filter: blur(4px);
+}
+.modal-overlay.hidden { display: none; }
+.modal {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 15px; width: min(580px,100%);
+  max-height: 88dvh; display: flex; flex-direction: column; overflow: hidden;
+}
+.modal-hdr {
+  padding: 18px 22px 14px; border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; gap: 10px;
+}
+.modal-hdr h2 { font-size: 1.05rem; font-weight: 700; flex: 1; }
+.modal-body { padding: 18px 22px; overflow-y: auto; flex: 1; }
+.modal-ftr {
+  padding: 14px 22px; border-top: 1px solid var(--border);
+  display: flex; gap: 8px; justify-content: flex-end;
+}
+
+/* upload area */
+.upload-area {
+  border: 2px dashed var(--border); border-radius: 11px;
+  padding: 28px; text-align: center; cursor: pointer;
+  transition: all 0.18s; position: relative; overflow: hidden;
+}
+.upload-area:hover, .upload-area.drag-over {
+  border-color: var(--accent); background: rgba(91,124,246,.05);
+}
+.upload-area input[type=file] { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+.upload-icon { font-size: 2.2rem; margin-bottom: 8px; }
+.upload-text  { font-size: 0.9rem; color: var(--muted); }
+.upload-prev  { margin-top: 10px; max-height: 170px; object-fit: contain; border-radius: 7px; display: none; }
+
+/* progress */
+.prog-bar {
+  display: none; align-items: center; gap: 10px;
+  padding: 10px 14px; background: rgba(91,124,246,.08);
+  border: 1px solid rgba(91,124,246,.2); border-radius: 9px;
+  margin-top: 14px; font-size: 0.86rem; color: var(--accent);
+}
+.prog-bar.show { display: flex; }
+.spinner {
+  width: 16px; height: 16px;
+  border: 2px solid rgba(91,124,246,.3); border-top-color: var(--accent);
+  border-radius: 50%; animation: spin 0.8s linear infinite; flex-shrink: 0;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ── EMPTY STATE ── */
+.empty-state {
+  flex: 1; display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  gap: 14px; color: var(--muted); padding: 40px; text-align: center;
+}
+.empty-state .ei { font-size: 2.8rem; }
+.empty-state h2 { font-size: 1.05rem; color: var(--lyric-color); }
+.empty-state p  { font-size: 0.85rem; line-height: 1.65; }
+
+/* ── AUTO-SCROLL CONTROL ── */
+.scroll-ctrl {
+  display: flex; align-items: center; gap: 6px;
+  background: var(--surface2); border: 1px solid var(--border);
+  border-radius: 8px; overflow: hidden; flex-shrink: 0;
+}
+.scroll-ctrl-label {
+  font-size: 0.72rem; color: var(--muted);
+  padding: 0 8px 0 10px; white-space: nowrap; user-select: none;
+}
+.scroll-speed-btn {
+  padding: 6px 10px; border: none; background: transparent;
+  color: var(--muted); font-family: var(--font-jp); font-size: 0.78rem;
+  cursor: pointer; transition: all 0.12s; white-space: nowrap;
+  border-left: 1px solid var(--border);
+}
+.scroll-speed-btn:hover { background: var(--border); color: var(--lyric-color); }
+.scroll-speed-btn.active { background: var(--success, #4caf82); color: #fff; }
+/* stop button style */
+.scroll-speed-btn.stop-btn.active { background: var(--surface2); color: var(--muted); }
+
+/* Scrolling indicator line at top of score */
+.scroll-progress {
+  height: 2px; background: transparent; flex-shrink: 0; transition: background 0.3s;
+}
+.scroll-progress.running { background: linear-gradient(90deg, var(--accent) 0%, var(--tab-color) 100%); }
+
+@media (max-width: 768px) {
+  .sidebar-wrap { width: 230px; }
+  .sidebar { width: 230px; }
+  .sidebar-wrap.collapsed .sidebar { transform: translateX(-230px); }
+  .score-scroll { padding: 14px 14px 60px; }
+  .scroll-ctrl-label { display: none; }
+}
+</style>
+</head>
+<body>
+
+<!-- TOPBAR -->
+<div class="topbar">
+  <div class="app-logo">🎸 UkeScore</div>
+  <div class="topbar-spacer"></div>
+  <div class="toggle-group" id="dispToggle">
+    <button class="active" data-m="chord"  onclick="setMode('chord')">コード名</button>
+    <button             data-m="tab"    onclick="setMode('tab')">タブ譜</button>
+    <button             data-m="both"   onclick="setMode('both')">両方</button>
+  </div>
+  <!-- Auto-scroll speed selector -->
+  <div class="scroll-ctrl" id="scrollCtrl">
+    <span class="scroll-ctrl-label">🎵 自動スクロール</span>
+    <button class="scroll-speed-btn stop-btn active" data-speed="0"  onclick="setScrollSpeed(0)">■ 停止</button>
+    <button class="scroll-speed-btn"                 data-speed="1"  onclick="setScrollSpeed(1)">遅</button>
+    <button class="scroll-speed-btn"                 data-speed="2"  onclick="setScrollSpeed(2)">中</button>
+    <button class="scroll-speed-btn"                 data-speed="3"  onclick="setScrollSpeed(3)">速</button>
+  </div>
+  <button class="btn btn-secondary btn-sm" id="editBtn" onclick="toggleEdit()">✏️ 編集</button>
+  <button class="btn btn-primary    btn-sm" onclick="openImport()">＋ 読み込む</button>
+</div>
+
+<!-- MAIN -->
+<div class="main">
+
+  <!-- Sidebar wrap (holds panel + collapsed tab) -->
+  <div class="sidebar-wrap" id="sidebarWrap">
+    <!-- Collapsed tab strip (visible when collapsed) -->
+    <div class="sidebar-tab" onclick="toggleSidebar()">
+      <span class="sidebar-tab-icon">🎵</span>
+      <span class="sidebar-tab-label">曲リスト</span>
+    </div>
+    <!-- Sidebar panel -->
+    <div class="sidebar" id="sidebar">
+      <div class="sidebar-header">
+        曲リスト
+        <button class="sidebar-close" onclick="toggleSidebar()" title="閉じる">✕</button>
+      </div>
+      <div class="song-list" id="songList"></div>
+      <div class="sidebar-footer">
+        <button class="btn btn-secondary btn-sm" style="width:100%;margin-bottom:6px" onclick="openImport()">＋ 曲を追加（写真）</button>
+        <div style="display:flex;gap:6px">
+          <button class="btn btn-secondary btn-sm" style="flex:1" onclick="exportData()">💾 保存</button>
+          <button class="btn btn-secondary btn-sm" style="flex:1" onclick="document.getElementById('dataFileInput').click()">📂 読込</button>
+        </div>
+        <input type="file" id="dataFileInput" accept=".json" style="display:none" onchange="importData(event)">
+      </div>
+    </div>
+  </div>
+
+  <!-- Score area -->
+  <div class="score-area" id="scoreArea">
+    <div class="empty-state" id="emptyState">
+      <div class="ei">🎵</div>
+      <h2>楽譜がありません</h2>
+      <p>「＋ 読み込む」ボタンから<br>コード譜の写真をアップロードしてください。</p>
+      <button class="btn btn-primary" onclick="openImport()">楽譜を読み込む</button>
+    </div>
+    <div id="songContent" style="display:none;flex-direction:column;height:100%;overflow:hidden;">
+      <div class="song-header">
+        <div class="song-title-display" id="titleDisp">—</div>
+        <div class="song-sub-display"   id="subDisp"></div>
+      </div>
+      <div class="chord-bar" id="chordBar"></div>
+      <div class="scroll-progress" id="scrollProgress"></div>
+      <div class="score-scroll" id="scoreScroll"></div>
+    </div>
+  </div>
+</div>
+
+<!-- Edit bar -->
+<div class="edit-bar" id="editBar">
+  <span>編集モード</span>
+  <span>コードをタップ→編集 / <kbd>◀▶</kbd>で文字移動</span>
+  <button class="btn btn-sm btn-secondary" onclick="toggleEdit()">完了</button>
+</div>
+
+<!-- Chord edit popup -->
+<div class="chord-popup" id="chordPopup">
+  <input id="chordInput" placeholder="例: G, Am, D7" autocomplete="off" autocorrect="off" spellcheck="false">
+  <div class="chord-popup-hint">Enter で確定 / 空欄で削除</div>
+  <div class="chord-popup-actions">
+    <button class="btn btn-sm btn-primary"    onclick="commitChordEdit()">確定</button>
+    <button class="btn btn-sm btn-secondary"  onclick="closeChordPopup()">キャンセル</button>
+    <button class="btn btn-sm btn-secondary" style="color:var(--danger);margin-left:auto" onclick="deleteChord()">削除</button>
+  </div>
+</div>
+
+<!-- Context menu -->
+<div class="ctx-menu" id="ctxMenu">
+  <div class="ctx-item" onclick="ctxDo('setChord')">🎸 コードを設定</div>
+  <div class="ctx-item" onclick="ctxDo('delChord')">✕ コードを削除</div>
+  <div class="ctx-div"></div>
+  <div class="ctx-item" onclick="ctxDo('editLine')">✏️ 歌詞行を編集</div>
+</div>
+
+<!-- Export fallback modal (for Safari which blocks auto-download) -->
+<div class="modal-overlay hidden" id="exportModal">
+  <div class="modal">
+    <div class="modal-hdr">
+      <h2>💾 曲データを保存</h2>
+      <button class="btn-icon" onclick="document.getElementById('exportModal').classList.add('hidden')">✕</button>
+    </div>
+    <div class="modal-body">
+      <p style="font-size:0.82rem;color:var(--muted);margin-bottom:10px">
+        下のテキストを全選択してコピーし、テキストエディタに貼り付けて <code>.json</code> ファイルとして保存してください。<br>
+        または上のタブに開いたJSONを「共有→ファイルに保存」で保存できます。
+      </p>
+      <textarea id="exportJson" readonly
+        onclick="this.select()"
+        style="width:100%;height:200px;background:var(--surface2);border:1px solid var(--border);
+               border-radius:8px;color:var(--lyric-color);font-family:var(--font-mono);
+               font-size:0.72rem;padding:8px;outline:none;resize:none;"></textarea>
+      <button class="btn btn-primary btn-sm" style="margin-top:8px;width:100%"
+        onclick="navigator.clipboard?.writeText(document.getElementById('exportJson').value).then(()=>alert('コピーしました'))">
+        📋 クリップボードにコピー
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- Import modal -->
+<div class="modal-overlay hidden" id="importModal">
+  <div class="modal">
+    <div class="modal-hdr">
+      <h2>🎵 楽譜を読み込む</h2>
+      <button class="btn-icon" onclick="closeImport()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="upload-area" id="uploadArea">
+        <input type="file" id="fileInput" accept="image/*" onchange="onFile(event)">
+        <div class="upload-icon">📷</div>
+        <div class="upload-text">コード譜の写真をタップして選択<br><small>JPG / PNG / HEIC 対応</small></div>
+        <img class="upload-prev" id="uploadPrev" alt="">
+      </div>
+      <div class="prog-bar" id="progBar">
+        <div class="spinner"></div>
+        <span id="progText">Claudeが解析中...</span>
+      </div>
+    </div>
+    <div class="modal-ftr">
+      <button class="btn btn-secondary" onclick="closeImport()">キャンセル</button>
+      <button class="btn btn-primary" id="analyzeBtn" onclick="analyze()" disabled>🔍 解析する</button>
+    </div>
+  </div>
+</div>
+
+<!-- Line edit modal -->
+<div class="modal-overlay hidden" id="lineEditModal">
+  <div class="modal">
+    <div class="modal-hdr">
+      <h2>✏️ 歌詞行を編集</h2>
+      <button class="btn-icon" onclick="closeLineEdit()">✕</button>
+    </div>
+    <div class="modal-body">
+      <p style="font-size:0.83rem;color:var(--muted);margin-bottom:10px">歌詞テキストを編集してください（コード位置は保持されます）</p>
+      <textarea id="lineEditTA" style="width:100%;height:80px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--lyric-color);font-family:var(--font-jp);font-size:1rem;padding:8px;outline:none;resize:none;"></textarea>
+    </div>
+    <div class="modal-ftr">
+      <button class="btn btn-secondary" onclick="closeLineEdit()">キャンセル</button>
+      <button class="btn btn-primary" onclick="commitLineEdit()">保存</button>
+    </div>
+  </div>
+</div>
+
+<script>
+'use strict';
+
+/* ════════════════════════════════════════════
+   DATA MODEL (v2)
+
+   Song {
+     title: string,
+     subtitle: string,
+     sections: Section[]
+   }
+   Section {
+     label: string,
+     lines: Line[]
+   }
+   Line {
+     chars:  string[],          // 1文字ずつ分割した配列（スペース含む）
+     chords: { [idx:string]: string }  // index文字目 → コード名
+   }
+   ════════════════════════════════════════════ */
+
+let songs = [];
+let currentIdx = -1;
+let dispMode = 'chord';  // 'chord' | 'tab' | 'both'
+let editMode = false;
+let imageB64 = null;
+
+// pending edit state
+let pendingSI = -1, pendingLI = -1, pendingCI = -1; // section/line/char
+let ctxSI = -1, ctxLI = -1, ctxCI = -1;
+
+/* ── Chord DB (GCEA tuning, strings top→bottom: A E C G) ── */
+const CHORD_DB = {
+  'C':  ['0','0','0','3'], 'Cm': ['3','3','3','5'], 'C7': ['0','0','0','1'],
+  'D':  ['2','2','2','0'], 'Dm': ['2','2','1','0'], 'D7': ['2','2','2','2'],
+  'E':  ['4','4','4','2'], 'Em': ['4','4','3','2'], 'E7': ['2','0','2','1'],
+  'F':  ['2','1','0','0'], 'Fm': ['1','0','1','3'], 'F7': ['2','1','2','0'],
+  'G':  ['2','3','2','0'], 'Gm': ['2','3','1','0'], 'G7': ['2','2','1','2'],
+  'A':  ['0','1','2','2'], 'Am': ['0','0','0','2'], 'A7': ['0','1','0','2'],
+  'B':  ['2','4','4','4'], 'Bm': ['2','2','2','4'], 'B7': ['2','0','2','2'],
+};
+
+function getFrets(name) {
+  return CHORD_DB[name?.trim()] || null;
+}
+function tabRefText(name) {
+  const f = getFrets(name);
+  if (!f) return 'A:?\nE:?\nC:?\nG:?';
+  return `A|${f[0]}\nE|${f[1]}\nC|${f[2]}\nG|${f[3]}`;
+}
+function tabVertHTML(name) {
+  const f = getFrets(name);
+  const vals = f || ['?','?','?','?'];
+  return `<div class="tab-v">${vals.map(v=>`<div>${v}</div>`).join('')}</div>`;
+}
+
+/* ── Persistence ── */
+function save() { localStorage.setItem('ukescore_v2', JSON.stringify(songs)); }
+function load() {
+  try { songs = JSON.parse(localStorage.getItem('ukescore_v2') || '[]'); } catch { songs = []; }
+}
+
+/* ── Export / Import ── */
+function exportData() {
+  const json = JSON.stringify({ version: 2, songs }, null, 2);
+  const blob = new Blob([json], { type: 'application/json' });
+  const url  = URL.createObjectURL(blob);
+  // Safari on iPad does not support <a download> triggered by JS.
+  // Open the JSON in a new tab — user can then share/save from Safari.
+  const win = window.open(url, '_blank');
+  if (!win) {
+    // Fallback: show the JSON in a textarea so user can copy it
+    showExportFallback(json);
+  }
+  setTimeout(() => URL.revokeObjectURL(url), 10000);
+}
+
+function showExportFallback(json) {
+  document.getElementById('exportJson').value = json;
+  document.getElementById('exportModal').classList.remove('hidden');
+}
+
+function importData(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = ev => {
+    try {
+      const parsed = JSON.parse(ev.target.result);
+      // 単曲（旧形式）or 複数曲ファイル両対応
+      let incoming = [];
+      if (parsed.version === 2 && Array.isArray(parsed.songs)) {
+        incoming = parsed.songs;
+      } else if (Array.isArray(parsed)) {
+        incoming = parsed;
+      } else if (parsed.title) {
+        incoming = [parsed];
+      } else {
+        alert('読み込めないファイル形式です');
+        return;
+      }
+      incoming = incoming.map(normalizeSong);
+      // 重複タイトルはスキップ（既存優先）
+      const existingTitles = new Set(songs.map(s => s.title));
+      let added = 0;
+      incoming.forEach(s => {
+        if (!existingTitles.has(s.title)) { songs.push(s); added++; }
+      });
+      save();
+      renderSongList();
+      if (added > 0 && currentIdx < 0) loadSong(0);
+      alert(`${added}曲を読み込みました（重複${incoming.length - added}曲はスキップ）`);
+    } catch(err) {
+      alert('読み込みに失敗しました: ' + err.message);
+    }
+    e.target.value = ''; // reset so same file can be re-imported
+  };
+  reader.readAsText(file);
+}
+
+/* ── Helpers: convert old block format → new char format ── */
+function blocksToLine(blocks) {
+  // blocks = [{chord, lyric}, ...]
+  const chars = [];
+  const chords = {};
+  for (const b of blocks) {
+    const lyric = b.lyric || '';
+    const ci = chars.length;
+    const charArr = [...lyric]; // Unicode-aware split
+    if (b.chord && charArr.length > 0) {
+      chords[String(ci)] = b.chord;
+    } else if (b.chord && charArr.length === 0) {
+      // chord with no lyric: insert a space holder
+      chords[String(ci)] = b.chord;
+      charArr.push(' ');
+    }
+    chars.push(...charArr);
+  }
+  return { chars, chords };
+}
+
+/* ── Normalize any song to v2 format ── */
+function normalizeSong(raw) {
+  const song = { title: raw.title || '無題', subtitle: raw.subtitle || '', sections: [] };
+  for (const sec of (raw.sections || [])) {
+    const lines = [];
+    for (const line of (sec.lines || [])) {
+      if (line.chars !== undefined) {
+        // already v2
+        lines.push({ chars: line.chars, chords: line.chords || {} });
+      } else if (line.blocks) {
+        lines.push(blocksToLine(line.blocks));
+      }
+    }
+    song.sections.push({ label: sec.label || '', lines });
+  }
+  return song;
+}
+
+/* ── Song list ── */
+function renderSongList() {
+  const el = document.getElementById('songList');
+  if (!songs.length) {
+    el.innerHTML = '<div style="padding:14px;color:var(--muted);font-size:0.83rem;text-align:center">曲がありません</div>';
+    return;
+  }
+  el.innerHTML = songs.map((s,i) => `
+    <div class="song-item ${i===currentIdx?'active':''}" onclick="loadSong(${i})">
+      <div class="si-title">${s.title}</div>
+      <div class="si-sub">${s.subtitle||''}</div>
+    </div>`).join('');
+}
+
+function loadSong(idx) {
+  currentIdx = idx;
+  stopScrollLoop();
+  setScrollSpeed(0);
+  const ss = document.getElementById('scoreScroll');
+  if (ss) ss.scrollTop = 0;
+  renderSongList();
+  renderSong();
+}
+
+/* ── Render song ── */
+function renderSong() {
+  if (currentIdx < 0 || !songs[currentIdx]) return;
+  const song = songs[currentIdx];
+  document.getElementById('emptyState').style.display = 'none';
+  const sc = document.getElementById('songContent');
+  sc.style.display = 'flex';
+  document.getElementById('titleDisp').textContent = song.title;
+  document.getElementById('subDisp').textContent   = song.subtitle || '';
+  renderChordBar(song);
+  renderScore(song);
+}
+
+function renderChordBar(song) {
+  const chords = new Set();
+  song.sections.forEach(sec =>
+    sec.lines.forEach(line =>
+      Object.values(line.chords).forEach(c => { if (c) chords.add(c.trim()); })
+    )
+  );
+  const showTab = dispMode !== 'chord';
+  document.getElementById('chordBar').innerHTML =
+    [...chords].filter(Boolean).map(c => `
+      <div class="cref">
+        <div class="cref-name">${c}</div>
+        <div class="cref-tab ${showTab?'show':''}">${tabRefText(c)}</div>
+      </div>`).join('');
+}
+
+function renderScore(song) {
+  document.getElementById('scoreScroll').innerHTML =
+    song.sections.map((sec, si) => `
+      <div class="sec-block">
+        ${sec.label ? `<div class="sec-label">${sec.label}</div>` : ''}
+        ${sec.lines.map((line, li) => renderLine(line, si, li)).join('')}
+      </div>`).join('');
+}
+
+function renderLine(line, si, li) {
+  const cells = line.chars.map((ch, ci) => renderCell(ch, ci, line.chords, si, li)).join('');
+  return `<div class="lyric-line" data-si="${si}" data-li="${li}">${cells}</div>`;
+}
+
+function renderCell(ch, ci, chords, si, li) {
+  const chord = chords[String(ci)] || '';
+  const hasChord = !!chord;
+  const em = editMode;
+
+  // Build chord area content
+  let chordAreaHTML = '';
+  if (hasChord) {
+    if (dispMode === 'chord') {
+      chordAreaHTML = `<span class="chord-name">${chord}</span>`;
+    } else if (dispMode === 'tab') {
+      chordAreaHTML = tabVertHTML(chord);
+    } else { // both
+      chordAreaHTML = `<span class="chord-name">${chord}</span>${tabVertHTML(chord)}`;
+    }
+  }
+
+  // Position controls (only in edit mode, only for cells with chord)
+  const posCtrl = (em && hasChord) ? `
+    <div class="pos-ctrl" onclick="event.stopPropagation()">
+      <button class="pos-btn" onclick="moveChord(${si},${li},${ci},-1)">◀</button>
+      <button class="pos-btn" onclick="moveChord(${si},${li},${ci},+1)">▶</button>
+    </div>` : '';
+
+  const classes = [
+    'char-cell',
+    em ? 'edit-mode' : '',
+    em && hasChord ? 'has-chord' : '',
+  ].filter(Boolean).join(' ');
+
+  const clickAttr = em
+    ? `onclick="cellClick(${si},${li},${ci})"
+       oncontextmenu="cellCtx(event,${si},${li},${ci})"`
+    : '';
+
+  const touchAttr = em
+    ? `ontouchstart="cellTouchStart(event,${si},${li},${ci})"
+       ontouchend="cellTouchEnd(event)"
+       ontouchmove="cellTouchEnd(event)"`
+    : '';
+
+  return `
+    <div class="${classes}" data-si="${si}" data-li="${li}" data-ci="${ci}" ${clickAttr} ${touchAttr}>
+      ${posCtrl}
+      <div class="chord-area">${chordAreaHTML}</div>
+      <div class="char-label">${ch === ' ' ? '&nbsp;' : ch}</div>
+    </div>`;
+}
+
+/* ── Move chord left/right by 1 character ── */
+function moveChord(si, li, ci, dir) {
+  event.stopPropagation();
+  const line = songs[currentIdx].sections[si].lines[li];
+  const chord = line.chords[String(ci)];
+  if (!chord) return;
+  const newCI = ci + dir;
+  if (newCI < 0 || newCI >= line.chars.length) return;
+  delete line.chords[String(ci)];
+  line.chords[String(newCI)] = chord;
+  save();
+  renderScore(songs[currentIdx]);
+}
+
+/* ── Cell interactions ── */
+let touchTimer = null;
+
+function cellTouchStart(e, si, li, ci) {
+  touchTimer = setTimeout(() => {
+    touchTimer = null;
+    cellCtx(e, si, li, ci);
+  }, 550);
+}
+function cellTouchEnd(e) {
+  if (touchTimer) { clearTimeout(touchTimer); touchTimer = null; }
+}
+
+function cellClick(si, li, ci) {
+  hideCtx();
+  const chord = songs[currentIdx].sections[si].lines[li].chords[String(ci)] || '';
+  openChordPopup(si, li, ci, chord);
+}
+
+function cellCtx(e, si, li, ci) {
+  e.preventDefault();
+  ctxSI = si; ctxLI = li; ctxCI = ci;
+  const menu = document.getElementById('ctxMenu');
+  const x = e.touches ? e.touches[0].clientX : e.clientX;
+  const y = e.touches ? e.touches[0].clientY : e.clientY;
+  menu.style.left = Math.min(x, innerWidth - 170) + 'px';
+  menu.style.top  = Math.min(y, innerHeight - 140) + 'px';
+  menu.classList.add('show');
+}
+
+function ctxDo(action) {
+  hideCtx();
+  if (ctxSI < 0) return;
+  if (action === 'setChord') {
+    const chord = songs[currentIdx].sections[ctxSI].lines[ctxLI].chords[String(ctxCI)] || '';
+    openChordPopup(ctxSI, ctxLI, ctxCI, chord);
+  } else if (action === 'delChord') {
+    delete songs[currentIdx].sections[ctxSI].lines[ctxLI].chords[String(ctxCI)];
+    save(); renderScore(songs[currentIdx]); renderChordBar(songs[currentIdx]);
+  } else if (action === 'editLine') {
+    openLineEdit(ctxSI, ctxLI);
+  }
+}
+
+function hideCtx() { document.getElementById('ctxMenu').classList.remove('show'); }
+document.addEventListener('click', hideCtx);
+
+/* ── Chord popup ── */
+function openChordPopup(si, li, ci, current) {
+  pendingSI = si; pendingLI = li; pendingCI = ci;
+  const popup = document.getElementById('chordPopup');
+  const input = document.getElementById('chordInput');
+  input.value = current;
+  popup.classList.add('show');
+
+  // Position near the cell
+  const cellEl = document.querySelector(
+    `.char-cell[data-si="${si}"][data-li="${li}"][data-ci="${ci}"]`);
+  if (cellEl) {
+    const r = cellEl.getBoundingClientRect();
+    const pw = 210, ph = 110;
+    let left = r.left;
+    let top  = r.bottom + 6;
+    if (left + pw > innerWidth)  left = innerWidth - pw - 8;
+    if (top  + ph > innerHeight) top  = r.top - ph - 6;
+    popup.style.left = left + 'px';
+    popup.style.top  = top  + 'px';
+  }
+  setTimeout(() => input.focus(), 30);
+}
+
+function commitChordEdit() {
+  if (pendingSI < 0) return;
+  const val = document.getElementById('chordInput').value.trim();
+  const line = songs[currentIdx].sections[pendingSI].lines[pendingLI];
+  if (val) {
+    line.chords[String(pendingCI)] = val;
+  } else {
+    delete line.chords[String(pendingCI)];
+  }
+  save();
+  renderScore(songs[currentIdx]);
+  renderChordBar(songs[currentIdx]);
+  closeChordPopup();
+}
+
+function deleteChord() {
+  if (pendingSI < 0) return;
+  delete songs[currentIdx].sections[pendingSI].lines[pendingLI].chords[String(pendingCI)];
+  save();
+  renderScore(songs[currentIdx]);
+  renderChordBar(songs[currentIdx]);
+  closeChordPopup();
+}
+
+function closeChordPopup() {
+  document.getElementById('chordPopup').classList.remove('show');
+  pendingSI = pendingLI = pendingCI = -1;
+}
+
+document.getElementById('chordInput').addEventListener('keydown', e => {
+  if (e.key === 'Enter') { e.preventDefault(); commitChordEdit(); }
+  if (e.key === 'Escape') closeChordPopup();
+});
+
+/* ── Line edit modal ── */
+let lineEditSI = -1, lineEditLI = -1;
+function openLineEdit(si, li) {
+  lineEditSI = si; lineEditLI = li;
+  const line = songs[currentIdx].sections[si].lines[li];
+  document.getElementById('lineEditTA').value = line.chars.join('');
+  document.getElementById('lineEditModal').classList.remove('hidden');
+}
+function closeLineEdit() {
+  document.getElementById('lineEditModal').classList.add('hidden');
+  lineEditSI = lineEditLI = -1;
+}
+function commitLineEdit() {
+  const text = document.getElementById('lineEditTA').value;
+  const newChars = [...text];
+  const line = songs[currentIdx].sections[lineEditSI].lines[lineEditLI];
+  // Keep chords that still fit within new length, remap by position
+  const newChords = {};
+  Object.entries(line.chords).forEach(([k, v]) => {
+    const idx = parseInt(k);
+    if (idx < newChars.length) newChords[String(idx)] = v;
+  });
+  line.chars  = newChars;
+  line.chords = newChords;
+  save();
+  renderScore(songs[currentIdx]);
+  closeLineEdit();
+}
+
+/* ── Display mode ── */
+function setMode(m) {
+  dispMode = m;
+  document.querySelectorAll('#dispToggle button').forEach(b =>
+    b.classList.toggle('active', b.dataset.m === m));
+  if (currentIdx >= 0) {
+    renderChordBar(songs[currentIdx]);
+    renderScore(songs[currentIdx]);
+  }
+}
+
+/* ── Edit mode ── */
+function toggleEdit() {
+  editMode = !editMode;
+  const btn = document.getElementById('editBtn');
+  btn.textContent  = editMode ? '✅ 編集中' : '✏️ 編集';
+  btn.className    = editMode ? 'btn btn-warn btn-sm' : 'btn btn-secondary btn-sm';
+  document.getElementById('editBar').classList.toggle('show', editMode);
+  if (currentIdx >= 0) renderScore(songs[currentIdx]);
+}
+
+/* ── Sidebar ── */
+function toggleSidebar() {
+  document.getElementById('sidebarWrap').classList.toggle('collapsed');
+}
+
+/* ── Auto-scroll ── */
+// px/sec for each speed level
+const SCROLL_SPEEDS = [0, 5, 10, 20];
+// interval(ms) = 1px ÷ (px/sec) × 1000  → always moves 1px per tick
+const SCROLL_INTERVALS = [0, 200, 100, 50]; // ms per 1px move
+let scrollSpeed = 0;
+let scrollTimer = null;
+
+function setScrollSpeed(level) {
+  scrollSpeed = level;
+  document.querySelectorAll('.scroll-speed-btn').forEach(b => {
+    b.classList.toggle('active', +b.dataset.speed === level);
+  });
+  document.getElementById('scrollProgress').classList.toggle('running', level > 0);
+  level > 0 ? startScrollLoop() : stopScrollLoop();
+}
+
+function startScrollLoop() {
+  stopScrollLoop();
+  scrollTimer = setInterval(() => {
+    const el = document.getElementById('scoreScroll');
+    if (!el) return;
+    el.scrollTop += 1;  // always exactly 1px per tick
+    if (el.scrollTop + el.clientHeight >= el.scrollHeight - 4) {
+      setScrollSpeed(0);
+    }
+  }, SCROLL_INTERVALS[scrollSpeed]);
+}
+
+function stopScrollLoop() {
+  if (scrollTimer) { clearInterval(scrollTimer); scrollTimer = null; }
+}
+
+
+
+/* ── Import ── */
+function openImport() {
+  imageB64 = null;
+  document.getElementById('analyzeBtn').disabled = true;
+  document.getElementById('uploadPrev').style.display = 'none';
+  document.getElementById('fileInput').value = '';
+  document.getElementById('progBar').classList.remove('show');
+  document.getElementById('importModal').classList.remove('hidden');
+}
+function closeImport() { document.getElementById('importModal').classList.add('hidden'); }
+
+const uploadArea = document.getElementById('uploadArea');
+uploadArea.addEventListener('dragover', e => { e.preventDefault(); uploadArea.classList.add('drag-over'); });
+uploadArea.addEventListener('dragleave', () => uploadArea.classList.remove('drag-over'));
+uploadArea.addEventListener('drop', e => {
+  e.preventDefault(); uploadArea.classList.remove('drag-over');
+  const f = e.dataTransfer.files[0]; if (f) readFile(f);
+});
+function onFile(e) { const f = e.target.files[0]; if (f) readFile(f); }
+
+function readFile(file) {
+  const r = new FileReader();
+  r.onload = e => {
+    const res = e.target.result;
+    imageB64 = res.split(',')[1];
+    const prev = document.getElementById('uploadPrev');
+    prev.src = res; prev.style.display = 'block';
+    document.getElementById('analyzeBtn').disabled = false;
+  };
+  r.readAsDataURL(file);
+}
+
+/* ── Analyze with Claude API ── */
+async function analyze() {
+  if (!imageB64) return;
+  const btn = document.getElementById('analyzeBtn');
+  btn.disabled = true;
+  const bar = document.getElementById('progBar');
+  bar.classList.add('show');
+  document.getElementById('progText').textContent = 'Claudeが楽譜を解析中...';
+
+  const prompt = `この画像はウクレレ用のコード譜（歌詞+コード名）です。
+以下のJSON形式で楽曲データを抽出してください。
+
+{
+  "title": "曲名",
+  "subtitle": "サブタイトル（なければ空文字）",
+  "sections": [
+    {
+      "label": "セクション名（例: イントロ、Aメロ、サビ。なければ空文字）",
+      "lines": [
+        {
+          "chars": ["ひ","ま","わ","り","畑","に","　","は","じ","け","る","笑","顔"],
+          "chords": {"0": "G", "7": "D"}
+        }
+      ]
+    }
+  ]
+}
+
+重要なルール：
+- chars は歌詞を1文字ずつ分割した配列。スペースや句読点も1文字として含める
+- chords はオブジェクト。キーは chars の index（文字列）、値はコード名
+- コードは、そのコードを弾き始める最初の文字のインデックスに対応させる
+- イントロなどコードのみの行は chars に空白やコード名の略称を入れてよい（例: chars:["　","　","　","　"], chords:{"0":"G","1":"D","2":"G","3":"G"}）
+- セクション（イントロ、Aメロ、Bメロ、サビ、アウトロ等）を認識して分ける
+- JSONのみ返答（説明文・コードブロック記法なし）`;
+
+  try {
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 6000,
+        messages: [{
+          role: 'user',
+          content: [
+            { type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: imageB64 } },
+            { type: 'text', text: prompt }
+          ]
+        }]
+      })
+    });
+    const data = await res.json();
+    const raw  = data.content?.map(c => c.text || '').join('');
+    const clean = raw.replace(/```json|```/g,'').trim();
+    const parsed = JSON.parse(clean);
+    const song = normalizeSong(parsed);
+    songs.push(song);
+    save();
+    currentIdx = songs.length - 1;
+    renderSongList();
+    renderSong();
+    closeImport();
+  } catch(err) {
+    document.getElementById('progText').textContent = '❌ 失敗: ' + err.message;
+    btn.disabled = false;
+  }
+}
+
+/* ── INIT ── */
+load();
+// migrate old data if present
+songs = songs.map(normalizeSong);
+save();
+renderSongList();
+if (songs.length > 0) loadSong(0);
+
+// Demo data (v2 char-level format) — 『素敵な南伊豆』
+// コード位置は楽譜画像から1文字単位で正確にマッピング
+if (songs.length === 0) {
+  // helper: spread string to char array
+  const c = s => [...s];
+  const demo = {
+    title: "素敵な南伊豆",
+    subtitle: "〜Summer Wonder Land〜",
+    sections: [
+      // ── イントロ ──
+      // G D G G
+      { label: "イントロ", lines: [
+        { chars: c("　　　　"), chords: {"0":"G","1":"D","2":"G","3":"G"} }
+      ]},
+
+      // ── 1番 Aメロ ──
+      // G(ひ)  D(は)
+      // ひまわり畑に　はじける笑顔
+      // 0123456 7890AB
+      { label: "1番 Aメロ", lines: [
+        { chars: c("ひまわり畑に　はじける笑顔"),
+          chords: {"0":"G", "7":"D"} },
+        // D7(光)Am(そ) D(　)Am(素)G(敵)D(な)G(南)  ← 楽譜: D7 Am D Am G D G
+        // 光る海　そよぐ風　素敵な南伊豆
+        // 0123 4567 89ABCDEF
+        { chars: c("光る海　そよぐ風　素敵な南伊豆"),
+          chords: {"0":"D7","4":"Am","8":"D","9":"Am","10":"G","12":"D","13":"G"} }
+      ]},
+
+      // ── 1番 Aメロ 2段目 ──
+      // G(こ)  D(に)
+      // ことりはさえずり　にゃんこも恋する
+      { label: "", lines: [
+        { chars: c("ことりはさえずり　にゃんこも恋する"),
+          chords: {"0":"G", "9":"D"} },
+        // D7 Am D Am G D G
+        // 一緒に　歩こう　素敵な南伊豆
+        // 01234 5678 9ABC
+        { chars: c("一緒に　歩こう　素敵な南伊豆"),
+          chords: {"0":"D7","3":"Am","5":"D","6":"Am","8":"G","10":"D","11":"G"} }
+      ]},
+
+      // ── サビ ──
+      // B(シ) E7(し) B(　) B(秘) E7(あ) B(　)
+      // シュノーケル　しようよ　秘密のあの浜で
+      // 0123456 7890A BCDEF
+      { label: "サビ", lines: [
+        { chars: c("シュノーケル　しようよ　秘密のあの浜で"),
+          chords: {"0":"B","7":"E7","11":"B","12":"B","15":"E7","18":"B"} },
+        // D(そ) G(魚) D(　) D(お) A(で) D(　) D7
+        // そうすりゃ魚たちと　おはなしできるから
+        // 01234 5678 9 ABCDEFGH
+        { chars: c("そうすりゃ魚たちと　おはなしできるから"),
+          chords: {"0":"D","5":"G","9":"D","10":"D","12":"A","14":"D","15":"D7"} }
+      ]},
+
+      // ── 2番 Aメロ ──
+      // G(菜)  D(ポ)
+      // 菜の花畑に　ポカポカ温泉
+      { label: "2番 Aメロ", lines: [
+        { chars: c("菜の花畑に　ポカポカ温泉"),
+          chords: {"0":"G","7":"D"} },
+        // D7 Am D Am G D G
+        // 2月にゃ　桜咲く　素敵な南伊豆
+        { chars: c("2月にゃ　桜咲く　素敵な南伊豆"),
+          chords: {"0":"D7","4":"Am","7":"D","8":"Am","10":"G","12":"D","13":"G"} }
+      ]},
+
+      // ── 2番 サビ ──
+      // B(美) E7(作) B(　) B(今) E7(パ) B(　)
+      // 美味しい料理作って　今夜はパーティーさ
+      { label: "", lines: [
+        { chars: c("美味しい料理作って　今夜はパーティーさ"),
+          chords: {"0":"B","6":"E7","10":"B","11":"B","14":"E7","17":"B"} },
+        // D(い) G(ゲ) D(　) D(ウ) A(弾) D D7
+        // いつものゲストハウスで　ウクレレ弾きながら
+        { chars: c("いつものゲストハウスで　ウクレレ弾きながら"),
+          chords: {"0":"D","5":"G","10":"D","11":"D","15":"A","16":"D","17":"D7"} }
+      ]},
+
+      // ── 3番 Aメロ ──
+      // G(こ)  D(み)
+      // ここで過ごせば　みんな幸せ
+      { label: "3番 Aメロ", lines: [
+        { chars: c("ここで過ごせば　みんな幸せ"),
+          chords: {"0":"G","8":"D"} },
+        // D7 Am D Am G D G
+        // 9月も　泳げる　素敵な南伊豆
+        { chars: c("9月も　泳げる　素敵な南伊豆"),
+          chords: {"0":"D7","4":"Am","7":"D","8":"Am","10":"G","12":"D","13":"G"} }
+      ]},
+
+      // ── アウトロ ──
+      // G D G　G D G
+      // 素敵な南伊豆
+      { label: "アウトロ", lines: [
+        { chars: c("　　　　　　"), chords: {"0":"G","1":"D","2":"G","3":"G","4":"D","5":"G"} },
+        { chars: c("素敵な南伊豆"), chords: {"0":"G"} }
+      ]}
+    ]
+  };
+  songs.push(demo);
+  save();
+  loadSong(0);
+}
+
+// 『こりゃさの音頭 Kolya Sa!』を追加（未登録の場合のみ）
+if (!songs.find(s => s.title === "こりゃさの音頭")) {
+  const c = s => [...s];
+  const kolya = {
+    title: "こりゃさの音頭",
+    subtitle: "Kolya Sa!",
+    sections: [
+      // ── イントロ ──
+      // |E7 A7 |D  |E7 A7 |D
+      { label: "イントロ", lines: [
+        { chars: c("　　　　　　　　"),
+          chords: {"0":"E7","1":"A7","2":"D","4":"E7","5":"A7","6":"D"} }
+      ]},
+
+      // ── A ──
+      { label: "A", lines: [
+        // |D                    |D
+        // Hear a Japanese singing コリャコリャ
+        { chars: c("Hear a Japanese singing コリャコリャ"),
+          chords: {"0":"D","23":"D"} },
+
+        // |D                    |D
+        // And the other one swinging ソレソレ
+        { chars: c("And the other one swinging ソレソレ"),
+          chords: {"0":"D","27":"D"} },
+
+        // |A7                   |D
+        // Then they all go singing while they're swinging
+        { chars: c("Then they all go singing while they're swinging"),
+          chords: {"0":"A7","22":"D"} },
+
+        // |A7              |D
+        // コリャサノ　サノサ
+        { chars: c("コリャサノ　サノサ"),
+          chords: {"0":"A7","7":"D"} }
+      ]},
+
+      // ── A' ──
+      { label: "A'", lines: [
+        // |D                        |D
+        // there's a GEISHA girl coming コリャコリャ
+        { chars: c("there's a GEISHA girl coming コリャコリャ"),
+          chords: {"0":"D","28":"D"} },
+
+        // |D                                   |D
+        // with her Ukerere (Shamisen) strumming ソレソレ
+        { chars: c("with her Ukerere (Shamisen) strumming ソレソレ"),
+          chords: {"0":"D","37":"D"} },
+
+        // |A7                              |D
+        // When she hears you humming she'll start strumming
+        { chars: c("When she hears you humming she'll start strumming"),
+          chords: {"0":"A7","27":"D"} },
+
+        // |A7              |D
+        // コリャサノ　サノサ
+        { chars: c("コリャサノ　サノサ"),
+          chords: {"0":"A7","7":"D"} }
+      ]},
+
+      // ── B ──
+      { label: "B", lines: [
+        // |G              |G                |D              |D
+        // For in the land of FUJI where every one likes SUSHI
+        { chars: c("For in the land of FUJI where every one likes SUSHI"),
+          chords: {"0":"G","15":"G","31":"D","46":"D"} },
+
+        // |E7          |E7
+        // They all making Whoopee
+        { chars: c("They all making Whoopee"),
+          chords: {"0":"E7","5":"E7"} },
+
+        // |A7
+        // Singing Ya! コリャサノサノ ヨイヨイヨイ
+        { chars: c("Singing Ya! コリャサノサノ　ヨイヨイヨイ"),
+          chords: {"0":"A7"} }
+      ]},
+
+      // ── A（ラスト） ──
+      { label: "A（ラスト）", lines: [
+        // |D                      |D
+        // There's a Japanese singing コリャコリャ
+        { chars: c("There's a Japanese singing コリャコリャ"),
+          chords: {"0":"D","26":"D"} },
+
+        // |D                    |D
+        // And the other one swinging ソレソレ
+        { chars: c("And the other one swinging ソレソレ"),
+          chords: {"0":"D","27":"D"} },
+
+        // |A7                         |D
+        // So they all go singing while they're swinging
+        { chars: c("So they all go singing while they're swinging"),
+          chords: {"0":"A7","21":"D"} },
+
+        // ①|A7              |D
+        //   コリャサノ　サノサ
+        { chars: c("①コリャサノ　サノサ"),
+          chords: {"1":"A7","8":"D"} },
+
+        // ②|A7              |D  D7 G Gm
+        //   コリャサノ　サノサ
+        { chars: c("②コリャサノ　サノサ"),
+          chords: {"1":"A7","8":"D","9":"D7","10":"G","11":"Gm"} }
+      ]}
+    ]
+  };
+  songs.push(kolya);
+  save();
+  renderSongList();
+  if (currentIdx < 0) loadSong(songs.length - 1);
+}
+
+// Attach touch-pause for auto-scroll (after DOM elements exist)
+;(function() {
+  const ss = document.getElementById('scoreScroll');
+  if (ss) {
+    ss.addEventListener('touchstart', () => { if (scrollSpeed > 0) setScrollSpeed(0); }, { passive: true });
+    ss.addEventListener('wheel',      () => { if (scrollSpeed > 0) setScrollSpeed(0); }, { passive: true });
+  }
+})();
+</script>
+</body>
+</html>
