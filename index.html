@@ -1171,9 +1171,9 @@ function toggleSidebar() {
 
 /* ── Auto-scroll ── */
 // px/sec for each speed level
-const SCROLL_SPEEDS = [0, 5, 10, 20];
+const SCROLL_SPEEDS = [0, 10, 20, 30];
 // interval(ms) = 1px ÷ (px/sec) × 1000  → always moves 1px per tick
-const SCROLL_INTERVALS = [0, 200, 100, 50]; // ms per 1px move
+const SCROLL_INTERVALS = [0, 100, 50, 33]; // ms per 1px move
 let scrollSpeed = 0;
 let scrollTimer = null;
 
