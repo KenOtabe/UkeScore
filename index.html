@@ -314,145 +314,12 @@ body {
   font-size: 1.1rem;
   line-height: 1.4;
   color: var(--lyric-color);
-  white-space: pre;        /* preserve spaces */
-  min-width: 0.55rem;      /* narrow chars still get a column */
+  white-space: pre;
+  min-width: 0.65em;       /* 細い文字(i,l,1)でも均等幅を確保 */
+  text-align: center;      /* 文字をセル中央に配置 */
+  display: block;
 }
 
-/* ── EDIT MODE styles ── */
-.char-cell.edit-mode {
-  cursor: pointer;
-  border-radius: 3px;
-  transition: background 0.1s;
-}
-.char-cell.edit-mode:hover { background: rgba(246,160,91,.1); }
-.char-cell.edit-mode.has-chord:hover .pos-ctrl { display: flex; }
-/* highlight active chord cell */
-.char-cell.chord-active { background: rgba(91,124,246,.15); border-radius: 3px; }
-
-/* ── POSITION CONTROLS ──
-   Float above the chord-area of a cell that already has a chord.
-   Only visible in edit mode on hover.
-*/
-.pos-ctrl {
-  display: none;
-  position: absolute;
-  top: -22px; left: 50%; transform: translateX(-50%);
-  align-items: center; gap: 2px;
-  background: var(--surface2); border: 1px solid var(--border);
-  border-radius: 6px; padding: 1px 4px;
-  white-space: nowrap; z-index: 20;
-}
-.pos-btn {
-  background: none; border: none; color: var(--muted);
-  font-size: 0.72rem; cursor: pointer; padding: 1px 5px;
-  border-radius: 3px; line-height: 1;
-  transition: background 0.1s, color 0.1s;
-}
-.pos-btn:hover { background: var(--border); color: var(--lyric-color); }
-
-/* ── CHORD EDIT POPUP ── */
-.chord-popup {
-  position: fixed; z-index: 300;
-  background: var(--surface); border: 1px solid var(--accent);
-  border-radius: 10px; padding: 10px 12px;
-  box-shadow: 0 8px 28px rgba(0,0,0,.5);
-  display: none;
-}
-.chord-popup.show { display: flex; flex-direction: column; gap: 6px; }
-.chord-popup input {
-  font-family: var(--font-hand); font-size: 1.1rem; font-weight: 700;
-  color: var(--chord-color); background: rgba(91,124,246,.12);
-  border: 1px solid var(--accent); border-radius: 5px;
-  outline: none; width: 80px; padding: 3px 6px;
-}
-.chord-popup-hint { font-size: 0.7rem; color: var(--muted); }
-.chord-popup-actions { display: flex; gap: 6px; }
-
-/* ── CONTEXT MENU ── */
-.ctx-menu {
-  position: fixed; background: var(--surface);
-  border: 1px solid var(--border); border-radius: 10px;
-  padding: 5px; z-index: 300; min-width: 150px;
-  box-shadow: 0 8px 24px rgba(0,0,0,.4); display: none;
-}
-.ctx-menu.show { display: block; }
-.ctx-item {
-  padding: 7px 11px; border-radius: 5px; cursor: pointer;
-  font-size: 0.83rem; display: flex; align-items: center; gap: 7px;
-  color: var(--lyric-color); transition: background 0.1s;
-}
-.ctx-item:hover { background: var(--surface2); }
-.ctx-item.danger { color: var(--danger); }
-.ctx-div { height: 1px; background: var(--border); margin: 3px 0; }
-
-/* ── EDIT TOOLBAR ── */
-.edit-bar {
-  display: none; position: fixed; bottom: 18px; left: 50%;
-  transform: translateX(-50%);
-  background: var(--surface); border: 1px solid var(--border);
-  border-radius: 40px; padding: 7px 16px;
-  gap: 10px; align-items: center; z-index: 150;
-  box-shadow: 0 6px 28px rgba(0,0,0,.45);
-  font-size: 0.8rem; color: var(--muted); white-space: nowrap;
-}
-.edit-bar.show { display: flex; }
-.edit-bar kbd {
-  background: var(--surface2); border: 1px solid var(--border);
-  border-radius: 3px; padding: 1px 5px;
-  font-family: var(--font-mono); font-size: 0.72rem; color: var(--lyric-color);
-}
-
-/* ── MODALS ── */
-.modal-overlay {
-  position: fixed; inset: 0; background: rgba(0,0,0,.72);
-  z-index: 200; display: flex; align-items: center; justify-content: center;
-  padding: 18px; backdrop-filter: blur(4px);
-}
-.modal-overlay.hidden { display: none; }
-.modal {
-  background: var(--surface); border: 1px solid var(--border);
-  border-radius: 15px; width: min(580px,100%);
-  max-height: 88dvh; display: flex; flex-direction: column; overflow: hidden;
-}
-.modal-hdr {
-  padding: 18px 22px 14px; border-bottom: 1px solid var(--border);
-  display: flex; align-items: center; gap: 10px;
-}
-.modal-hdr h2 { font-size: 1.05rem; font-weight: 700; flex: 1; }
-.modal-body { padding: 18px 22px; overflow-y: auto; flex: 1; }
-.modal-ftr {
-  padding: 14px 22px; border-top: 1px solid var(--border);
-  display: flex; gap: 8px; justify-content: flex-end;
-}
-
-/* upload area */
-.upload-area {
-  border: 2px dashed var(--border); border-radius: 11px;
-  padding: 28px; text-align: center; cursor: pointer;
-  transition: all 0.18s; position: relative; overflow: hidden;
-}
-.upload-area:hover, .upload-area.drag-over {
-  border-color: var(--accent); background: rgba(91,124,246,.05);
-}
-.upload-area input[type=file] { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
-.upload-icon { font-size: 2.2rem; margin-bottom: 8px; }
-.upload-text  { font-size: 0.9rem; color: var(--muted); }
-.upload-prev  { margin-top: 10px; max-height: 170px; object-fit: contain; border-radius: 7px; display: none; }
-
-/* progress */
-.prog-bar {
-  display: none; align-items: center; gap: 10px;
-  padding: 10px 14px; background: rgba(91,124,246,.08);
-  border: 1px solid rgba(91,124,246,.2); border-radius: 9px;
-  margin-top: 14px; font-size: 0.86rem; color: var(--accent);
-}
-.prog-bar.show { display: flex; }
-.spinner {
-  width: 16px; height: 16px;
-  border: 2px solid rgba(91,124,246,.3); border-top-color: var(--accent);
-  border-radius: 50%; animation: spin 0.8s linear infinite; flex-shrink: 0;
-}
-@keyframes spin { to { transform: rotate(360deg); } }
 
 /* ── EMPTY STATE ── */
 .empty-state {
@@ -519,8 +386,6 @@ body {
     <button class="scroll-speed-btn"                 data-speed="2"  onclick="setScrollSpeed(2)">中</button>
     <button class="scroll-speed-btn"                 data-speed="3"  onclick="setScrollSpeed(3)">速</button>
   </div>
-  <button class="btn btn-secondary btn-sm" id="editBtn" onclick="toggleEdit()">✏️ 編集</button>
-  <button class="btn btn-primary    btn-sm" onclick="openImport()">＋ 読み込む</button>
 </div>
 
 <!-- MAIN -->
@@ -541,7 +406,6 @@ body {
       </div>
       <div class="song-list" id="songList"></div>
       <div class="sidebar-footer">
-        <button class="btn btn-secondary btn-sm" style="width:100%;margin-bottom:6px" onclick="openImport()">＋ 曲を追加（写真）</button>
         <div style="display:flex;gap:6px">
           <button class="btn btn-secondary btn-sm" style="flex:1" onclick="exportData()">💾 保存</button>
           <button class="btn btn-secondary btn-sm" style="flex:1" onclick="document.getElementById('dataFileInput').click()">📂 読込</button>
@@ -556,8 +420,7 @@ body {
     <div class="empty-state" id="emptyState">
       <div class="ei">🎵</div>
       <h2>楽譜がありません</h2>
-      <p>「＋ 読み込む」ボタンから<br>コード譜の写真をアップロードしてください。</p>
-      <button class="btn btn-primary" onclick="openImport()">楽譜を読み込む</button>
+      <p>サイドバーの「📂 読込」から<br>曲データファイルを読み込んでください。</p>
     </div>
     <div id="songContent" style="display:none;flex-direction:column;height:100%;overflow:hidden;">
       <div class="song-header">
@@ -567,101 +430,6 @@ body {
       <div class="chord-bar" id="chordBar"></div>
       <div class="scroll-progress" id="scrollProgress"></div>
       <div class="score-scroll" id="scoreScroll"></div>
-    </div>
-  </div>
-</div>
-
-<!-- Edit bar -->
-<div class="edit-bar" id="editBar">
-  <span>編集モード</span>
-  <span>コードをタップ→編集 / <kbd>◀▶</kbd>で文字移動</span>
-  <button class="btn btn-sm btn-secondary" onclick="toggleEdit()">完了</button>
-</div>
-
-<!-- Chord edit popup -->
-<div class="chord-popup" id="chordPopup">
-  <input id="chordInput" placeholder="例: G, Am, D7" autocomplete="off" autocorrect="off" spellcheck="false">
-  <div class="chord-popup-hint">Enter で確定 / 空欄で削除</div>
-  <div class="chord-popup-actions">
-    <button class="btn btn-sm btn-primary"    onclick="commitChordEdit()">確定</button>
-    <button class="btn btn-sm btn-secondary"  onclick="closeChordPopup()">キャンセル</button>
-    <button class="btn btn-sm btn-secondary" style="color:var(--danger);margin-left:auto" onclick="deleteChord()">削除</button>
-  </div>
-</div>
-
-<!-- Context menu -->
-<div class="ctx-menu" id="ctxMenu">
-  <div class="ctx-item" onclick="ctxDo('setChord')">🎸 コードを設定</div>
-  <div class="ctx-item" onclick="ctxDo('delChord')">✕ コードを削除</div>
-  <div class="ctx-div"></div>
-  <div class="ctx-item" onclick="ctxDo('editLine')">✏️ 歌詞行を編集</div>
-</div>
-
-<!-- Export fallback modal (for Safari which blocks auto-download) -->
-<div class="modal-overlay hidden" id="exportModal">
-  <div class="modal">
-    <div class="modal-hdr">
-      <h2>💾 曲データを保存</h2>
-      <button class="btn-icon" onclick="document.getElementById('exportModal').classList.add('hidden')">✕</button>
-    </div>
-    <div class="modal-body">
-      <p style="font-size:0.82rem;color:var(--muted);margin-bottom:10px">
-        下のテキストを全選択してコピーし、テキストエディタに貼り付けて <code>.json</code> ファイルとして保存してください。<br>
-        または上のタブに開いたJSONを「共有→ファイルに保存」で保存できます。
-      </p>
-      <textarea id="exportJson" readonly
-        onclick="this.select()"
-        style="width:100%;height:200px;background:var(--surface2);border:1px solid var(--border);
-               border-radius:8px;color:var(--lyric-color);font-family:var(--font-mono);
-               font-size:0.72rem;padding:8px;outline:none;resize:none;"></textarea>
-      <button class="btn btn-primary btn-sm" style="margin-top:8px;width:100%"
-        onclick="navigator.clipboard?.writeText(document.getElementById('exportJson').value).then(()=>alert('コピーしました'))">
-        📋 クリップボードにコピー
-      </button>
-    </div>
-  </div>
-</div>
-
-<!-- Import modal -->
-<div class="modal-overlay hidden" id="importModal">
-  <div class="modal">
-    <div class="modal-hdr">
-      <h2>🎵 楽譜を読み込む</h2>
-      <button class="btn-icon" onclick="closeImport()">✕</button>
-    </div>
-    <div class="modal-body">
-      <div class="upload-area" id="uploadArea">
-        <input type="file" id="fileInput" accept="image/*" onchange="onFile(event)">
-        <div class="upload-icon">📷</div>
-        <div class="upload-text">コード譜の写真をタップして選択<br><small>JPG / PNG / HEIC 対応</small></div>
-        <img class="upload-prev" id="uploadPrev" alt="">
-      </div>
-      <div class="prog-bar" id="progBar">
-        <div class="spinner"></div>
-        <span id="progText">Claudeが解析中...</span>
-      </div>
-    </div>
-    <div class="modal-ftr">
-      <button class="btn btn-secondary" onclick="closeImport()">キャンセル</button>
-      <button class="btn btn-primary" id="analyzeBtn" onclick="analyze()" disabled>🔍 解析する</button>
-    </div>
-  </div>
-</div>
-
-<!-- Line edit modal -->
-<div class="modal-overlay hidden" id="lineEditModal">
-  <div class="modal">
-    <div class="modal-hdr">
-      <h2>✏️ 歌詞行を編集</h2>
-      <button class="btn-icon" onclick="closeLineEdit()">✕</button>
-    </div>
-    <div class="modal-body">
-      <p style="font-size:0.83rem;color:var(--muted);margin-bottom:10px">歌詞テキストを編集してください（コード位置は保持されます）</p>
-      <textarea id="lineEditTA" style="width:100%;height:80px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--lyric-color);font-family:var(--font-jp);font-size:1rem;padding:8px;outline:none;resize:none;"></textarea>
-    </div>
-    <div class="modal-ftr">
-      <button class="btn btn-secondary" onclick="closeLineEdit()">キャンセル</button>
-      <button class="btn btn-primary" onclick="commitLineEdit()">保存</button>
     </div>
   </div>
 </div>
@@ -698,12 +466,6 @@ body {
 let songs = [];
 let currentIdx = -1;
 let dispMode = 'chord';  // 'chord' | 'tab' | 'both'
-let editMode = false;
-let imageB64 = null;
-
-// pending edit state
-let pendingSI = -1, pendingLI = -1, pendingCI = -1; // section/line/char
-let ctxSI = -1, ctxLI = -1, ctxCI = -1;
 
 /* ── Chord DB (GCEA tuning, strings: G C E A 低音→高音) ── */
 /* ── Chord DB (GCEA tuning, strings: A E C G 上から順) ── */
@@ -743,19 +505,8 @@ function exportData() {
   const json = JSON.stringify({ version: 2, songs }, null, 2);
   const blob = new Blob([json], { type: 'application/json' });
   const url  = URL.createObjectURL(blob);
-  // Safari on iPad does not support <a download> triggered by JS.
-  // Open the JSON in a new tab — user can then share/save from Safari.
   const win = window.open(url, '_blank');
-  if (!win) {
-    // Fallback: show the JSON in a textarea so user can copy it
-    showExportFallback(json);
-  }
   setTimeout(() => URL.revokeObjectURL(url), 10000);
-}
-
-function showExportFallback(json) {
-  document.getElementById('exportJson').value = json;
-  document.getElementById('exportModal').classList.remove('hidden');
 }
 
 function importData(e) {
@@ -950,199 +701,21 @@ function renderLine(line, si, li) {
 
 function renderCell(ch, ci, chords, si, li) {
   const chord = chords[String(ci)] || '';
-  const hasChord = !!chord;
-  const em = editMode;
-
-  // Build chord area content
   let chordAreaHTML = '';
-  if (hasChord) {
+  if (chord) {
     if (dispMode === 'chord') {
       chordAreaHTML = `<span class="chord-name">${chord}</span>`;
     } else if (dispMode === 'tab') {
       chordAreaHTML = tabVertHTML(chord);
-    } else { // both
+    } else {
       chordAreaHTML = `<span class="chord-name">${chord}</span>${tabVertHTML(chord)}`;
     }
   }
-
-  // Position controls (only in edit mode, only for cells with chord)
-  const posCtrl = (em && hasChord) ? `
-    <div class="pos-ctrl" onclick="event.stopPropagation()">
-      <button class="pos-btn" onclick="moveChord(${si},${li},${ci},-1)">◀</button>
-      <button class="pos-btn" onclick="moveChord(${si},${li},${ci},+1)">▶</button>
-    </div>` : '';
-
-  const classes = [
-    'char-cell',
-    em ? 'edit-mode' : '',
-    em && hasChord ? 'has-chord' : '',
-  ].filter(Boolean).join(' ');
-
-  const clickAttr = em
-    ? `onclick="cellClick(${si},${li},${ci})"
-       oncontextmenu="cellCtx(event,${si},${li},${ci})"`
-    : '';
-
-  const touchAttr = em
-    ? `ontouchstart="cellTouchStart(event,${si},${li},${ci})"
-       ontouchend="cellTouchEnd(event)"
-       ontouchmove="cellTouchEnd(event)"`
-    : '';
-
   return `
-    <div class="${classes}" data-si="${si}" data-li="${li}" data-ci="${ci}" ${clickAttr} ${touchAttr}>
-      ${posCtrl}
+    <div class="char-cell">
       <div class="chord-area">${chordAreaHTML}</div>
       <div class="char-label">${ch === ' ' ? '&nbsp;' : ch}</div>
     </div>`;
-}
-
-/* ── Move chord left/right by 1 character ── */
-function moveChord(si, li, ci, dir) {
-  event.stopPropagation();
-  const line = songs[currentIdx].sections[si].lines[li];
-  const chord = line.chords[String(ci)];
-  if (!chord) return;
-  const newCI = ci + dir;
-  if (newCI < 0 || newCI >= line.chars.length) return;
-  delete line.chords[String(ci)];
-  line.chords[String(newCI)] = chord;
-  save();
-  renderScore(songs[currentIdx]);
-}
-
-/* ── Cell interactions ── */
-let touchTimer = null;
-
-function cellTouchStart(e, si, li, ci) {
-  touchTimer = setTimeout(() => {
-    touchTimer = null;
-    cellCtx(e, si, li, ci);
-  }, 550);
-}
-function cellTouchEnd(e) {
-  if (touchTimer) { clearTimeout(touchTimer); touchTimer = null; }
-}
-
-function cellClick(si, li, ci) {
-  hideCtx();
-  const chord = songs[currentIdx].sections[si].lines[li].chords[String(ci)] || '';
-  openChordPopup(si, li, ci, chord);
-}
-
-function cellCtx(e, si, li, ci) {
-  e.preventDefault();
-  ctxSI = si; ctxLI = li; ctxCI = ci;
-  const menu = document.getElementById('ctxMenu');
-  const x = e.touches ? e.touches[0].clientX : e.clientX;
-  const y = e.touches ? e.touches[0].clientY : e.clientY;
-  menu.style.left = Math.min(x, innerWidth - 170) + 'px';
-  menu.style.top  = Math.min(y, innerHeight - 140) + 'px';
-  menu.classList.add('show');
-}
-
-function ctxDo(action) {
-  hideCtx();
-  if (ctxSI < 0) return;
-  if (action === 'setChord') {
-    const chord = songs[currentIdx].sections[ctxSI].lines[ctxLI].chords[String(ctxCI)] || '';
-    openChordPopup(ctxSI, ctxLI, ctxCI, chord);
-  } else if (action === 'delChord') {
-    delete songs[currentIdx].sections[ctxSI].lines[ctxLI].chords[String(ctxCI)];
-    save(); renderScore(songs[currentIdx]); renderChordBar(songs[currentIdx]);
-  } else if (action === 'editLine') {
-    openLineEdit(ctxSI, ctxLI);
-  }
-}
-
-function hideCtx() { document.getElementById('ctxMenu').classList.remove('show'); }
-document.addEventListener('click', hideCtx);
-
-/* ── Chord popup ── */
-function openChordPopup(si, li, ci, current) {
-  pendingSI = si; pendingLI = li; pendingCI = ci;
-  const popup = document.getElementById('chordPopup');
-  const input = document.getElementById('chordInput');
-  input.value = current;
-  popup.classList.add('show');
-
-  // Position near the cell
-  const cellEl = document.querySelector(
-    `.char-cell[data-si="${si}"][data-li="${li}"][data-ci="${ci}"]`);
-  if (cellEl) {
-    const r = cellEl.getBoundingClientRect();
-    const pw = 210, ph = 110;
-    let left = r.left;
-    let top  = r.bottom + 6;
-    if (left + pw > innerWidth)  left = innerWidth - pw - 8;
-    if (top  + ph > innerHeight) top  = r.top - ph - 6;
-    popup.style.left = left + 'px';
-    popup.style.top  = top  + 'px';
-  }
-  setTimeout(() => input.focus(), 30);
-}
-
-function commitChordEdit() {
-  if (pendingSI < 0) return;
-  const val = document.getElementById('chordInput').value.trim();
-  const line = songs[currentIdx].sections[pendingSI].lines[pendingLI];
-  if (val) {
-    line.chords[String(pendingCI)] = val;
-  } else {
-    delete line.chords[String(pendingCI)];
-  }
-  save();
-  renderScore(songs[currentIdx]);
-  renderChordBar(songs[currentIdx]);
-  closeChordPopup();
-}
-
-function deleteChord() {
-  if (pendingSI < 0) return;
-  delete songs[currentIdx].sections[pendingSI].lines[pendingLI].chords[String(pendingCI)];
-  save();
-  renderScore(songs[currentIdx]);
-  renderChordBar(songs[currentIdx]);
-  closeChordPopup();
-}
-
-function closeChordPopup() {
-  document.getElementById('chordPopup').classList.remove('show');
-  pendingSI = pendingLI = pendingCI = -1;
-}
-
-document.getElementById('chordInput').addEventListener('keydown', e => {
-  if (e.key === 'Enter') { e.preventDefault(); commitChordEdit(); }
-  if (e.key === 'Escape') closeChordPopup();
-});
-
-/* ── Line edit modal ── */
-let lineEditSI = -1, lineEditLI = -1;
-function openLineEdit(si, li) {
-  lineEditSI = si; lineEditLI = li;
-  const line = songs[currentIdx].sections[si].lines[li];
-  document.getElementById('lineEditTA').value = line.chars.join('');
-  document.getElementById('lineEditModal').classList.remove('hidden');
-}
-function closeLineEdit() {
-  document.getElementById('lineEditModal').classList.add('hidden');
-  lineEditSI = lineEditLI = -1;
-}
-function commitLineEdit() {
-  const text = document.getElementById('lineEditTA').value;
-  const newChars = [...text];
-  const line = songs[currentIdx].sections[lineEditSI].lines[lineEditLI];
-  // Keep chords that still fit within new length, remap by position
-  const newChords = {};
-  Object.entries(line.chords).forEach(([k, v]) => {
-    const idx = parseInt(k);
-    if (idx < newChars.length) newChords[String(idx)] = v;
-  });
-  line.chars  = newChars;
-  line.chords = newChords;
-  save();
-  renderScore(songs[currentIdx]);
-  closeLineEdit();
 }
 
 /* ── Display mode ── */
@@ -1154,16 +727,6 @@ function setMode(m) {
     renderChordBar(songs[currentIdx]);
     renderScore(songs[currentIdx]);
   }
-}
-
-/* ── Edit mode ── */
-function toggleEdit() {
-  editMode = !editMode;
-  const btn = document.getElementById('editBtn');
-  btn.textContent  = editMode ? '✅ 編集中' : '✏️ 編集';
-  btn.className    = editMode ? 'btn btn-warn btn-sm' : 'btn btn-secondary btn-sm';
-  document.getElementById('editBar').classList.toggle('show', editMode);
-  if (currentIdx >= 0) renderScore(songs[currentIdx]);
 }
 
 /* ── Sidebar ── */
@@ -1205,107 +768,6 @@ function stopScrollLoop() {
 }
 
 
-
-/* ── Import ── */
-function openImport() {
-  imageB64 = null;
-  document.getElementById('analyzeBtn').disabled = true;
-  document.getElementById('uploadPrev').style.display = 'none';
-  document.getElementById('fileInput').value = '';
-  document.getElementById('progBar').classList.remove('show');
-  document.getElementById('importModal').classList.remove('hidden');
-}
-function closeImport() { document.getElementById('importModal').classList.add('hidden'); }
-
-const uploadArea = document.getElementById('uploadArea');
-uploadArea.addEventListener('dragover', e => { e.preventDefault(); uploadArea.classList.add('drag-over'); });
-uploadArea.addEventListener('dragleave', () => uploadArea.classList.remove('drag-over'));
-uploadArea.addEventListener('drop', e => {
-  e.preventDefault(); uploadArea.classList.remove('drag-over');
-  const f = e.dataTransfer.files[0]; if (f) readFile(f);
-});
-function onFile(e) { const f = e.target.files[0]; if (f) readFile(f); }
-
-function readFile(file) {
-  const r = new FileReader();
-  r.onload = e => {
-    const res = e.target.result;
-    imageB64 = res.split(',')[1];
-    const prev = document.getElementById('uploadPrev');
-    prev.src = res; prev.style.display = 'block';
-    document.getElementById('analyzeBtn').disabled = false;
-  };
-  r.readAsDataURL(file);
-}
-
-/* ── Analyze with Claude API ── */
-async function analyze() {
-  if (!imageB64) return;
-  const btn = document.getElementById('analyzeBtn');
-  btn.disabled = true;
-  const bar = document.getElementById('progBar');
-  bar.classList.add('show');
-  document.getElementById('progText').textContent = 'Claudeが楽譜を解析中...';
-
-  const prompt = `この画像はウクレレ用のコード譜（歌詞+コード名）です。
-以下のJSON形式で楽曲データを抽出してください。
-
-{
-  "title": "曲名",
-  "subtitle": "サブタイトル（なければ空文字）",
-  "sections": [
-    {
-      "label": "セクション名（例: イントロ、Aメロ、サビ。なければ空文字）",
-      "lines": [
-        {
-          "chars": ["ひ","ま","わ","り","畑","に","　","は","じ","け","る","笑","顔"],
-          "chords": {"0": "G", "7": "D"}
-        }
-      ]
-    }
-  ]
-}
-
-重要なルール：
-- chars は歌詞を1文字ずつ分割した配列。スペースや句読点も1文字として含める
-- chords はオブジェクト。キーは chars の index（文字列）、値はコード名
-- コードは、そのコードを弾き始める最初の文字のインデックスに対応させる
-- イントロなどコードのみの行は chars に空白やコード名の略称を入れてよい（例: chars:["　","　","　","　"], chords:{"0":"G","1":"D","2":"G","3":"G"}）
-- セクション（イントロ、Aメロ、Bメロ、サビ、アウトロ等）を認識して分ける
-- JSONのみ返答（説明文・コードブロック記法なし）`;
-
-  try {
-    const res = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model: 'claude-sonnet-4-20250514',
-        max_tokens: 6000,
-        messages: [{
-          role: 'user',
-          content: [
-            { type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: imageB64 } },
-            { type: 'text', text: prompt }
-          ]
-        }]
-      })
-    });
-    const data = await res.json();
-    const raw  = data.content?.map(c => c.text || '').join('');
-    const clean = raw.replace(/```json|```/g,'').trim();
-    const parsed = JSON.parse(clean);
-    const song = normalizeSong(parsed);
-    songs.push(song);
-    save();
-    currentIdx = songs.length - 1;
-    renderSongList();
-    renderSong();
-    closeImport();
-  } catch(err) {
-    document.getElementById('progText').textContent = '❌ 失敗: ' + err.message;
-    btn.disabled = false;
-  }
-}
 
 /* ── INIT ── */
 load();
