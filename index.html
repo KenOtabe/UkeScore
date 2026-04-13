@@ -283,7 +283,7 @@ body {
 /* chord name label */
 .chord-name {
   font-family: var(--font-hand);
-  font-size: 1.05rem;
+  font-size: var(--score-chord-size, 1.05rem);
   font-weight: 700;
   color: var(--chord-color);
   white-space: nowrap;
@@ -296,7 +296,7 @@ body {
   flex-direction: column;
   align-items: center;
   font-family: var(--font-mono);
-  font-size: 0.72rem;
+  font-size: var(--score-tab-size, 0.72rem);
   font-weight: 700;
   line-height: 1.45;
   color: var(--tab-color);
@@ -305,19 +305,25 @@ body {
   border-radius: 4px;
   padding: 2px 5px;
   white-space: nowrap;
-  /* gap below so it never bleeds into the char row */
   margin-bottom: 4px;
 }
 
 /* char label */
 .char-label {
-  font-size: 1.1rem;
+  font-size: var(--score-lyric-size, 1.1rem);
   line-height: 1.4;
   color: var(--lyric-color);
   white-space: pre;
-  min-width: 0.65em;       /* 細い文字(i,l,1)でも均等幅を確保 */
-  text-align: center;      /* 文字をセル中央に配置 */
+  min-width: 0.65em;
+  text-align: center;
   display: block;
+}
+
+/* Large font mode */
+.score-scroll.font-large {
+  --score-chord-size: 1.575rem;
+  --score-tab-size:   1.08rem;
+  --score-lyric-size: 1.65rem;
 }
 
 
@@ -377,6 +383,11 @@ body {
     <button class="active" data-m="chord"  onclick="setMode('chord')">コード名</button>
     <button             data-m="tab"    onclick="setMode('tab')">タブ譜</button>
     <button             data-m="both"   onclick="setMode('both')">両方</button>
+  </div>
+  <!-- Font size toggle -->
+  <div class="toggle-group" id="fontToggle">
+    <button class="active" data-f="normal" onclick="setFontSize('normal')">標準</button>
+    <button             data-f="large"  onclick="setFontSize('large')">大</button>
   </div>
   <!-- Auto-scroll speed selector -->
   <div class="scroll-ctrl" id="scrollCtrl">
@@ -728,6 +739,14 @@ function setMode(m) {
     renderChordBar(songs[currentIdx]);
     renderScore(songs[currentIdx]);
   }
+}
+
+/* ── Font size ── */
+function setFontSize(size) {
+  document.querySelectorAll('#fontToggle button').forEach(b =>
+    b.classList.toggle('active', b.dataset.f === size));
+  const ss = document.getElementById('scoreScroll');
+  if (ss) ss.classList.toggle('font-large', size === 'large');
 }
 
 /* ── Sidebar ── */
