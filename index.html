@@ -402,8 +402,8 @@ body {
     <button class="scroll-btn" onclick="changeScrollPx(+1)">▶</button>
     <div class="toggle-group" id="intervalToggle" style="border-radius:0;border:none;border-left:1px solid var(--border)">
       <button data-iv="200" onclick="setScrollInterval(200)">遅</button>
-      <button data-iv="100" class="active" onclick="setScrollInterval(100)">中</button>
-      <button data-iv="50"  onclick="setScrollInterval(50)">速</button>
+      <button data-iv="170" class="active" onclick="setScrollInterval(170)">中</button>
+      <button data-iv="140" onclick="setScrollInterval(140)">速</button>
     </div>
   </div>
 </div>
@@ -764,7 +764,7 @@ function toggleSidebar() {
 }
 
 /* ── Auto-scroll ── */
-const SCROLL_INTERVAL_DEFAULT = 100;
+const SCROLL_INTERVAL_DEFAULT = 170;
 let scrollInterval = SCROLL_INTERVAL_DEFAULT; // ms（変更可能）
 let scrollPx      = 0;
 let scrollRunning = false;
