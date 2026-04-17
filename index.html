@@ -339,7 +339,7 @@ body {
 
 /* ── AUTO-SCROLL CONTROL ── */
 .scroll-ctrl {
-  display: flex; align-items: center; gap: 6px;
+  display: flex; align-items: center; gap: 0;
   background: var(--surface2); border: 1px solid var(--border);
   border-radius: 8px; overflow: hidden; flex-shrink: 0;
 }
@@ -347,16 +347,20 @@ body {
   font-size: 0.72rem; color: var(--muted);
   padding: 0 8px 0 10px; white-space: nowrap; user-select: none;
 }
-.scroll-speed-btn {
-  padding: 6px 10px; border: none; background: transparent;
-  color: var(--muted); font-family: var(--font-jp); font-size: 0.78rem;
+.scroll-btn {
+  padding: 6px 11px; border: none; background: transparent;
+  color: var(--muted); font-family: var(--font-jp); font-size: 0.82rem;
   cursor: pointer; transition: all 0.12s; white-space: nowrap;
-  border-left: 1px solid var(--border);
+  border-left: 1px solid var(--border); line-height: 1;
 }
-.scroll-speed-btn:hover { background: var(--border); color: var(--lyric-color); }
-.scroll-speed-btn.active { background: var(--success, #4caf82); color: #fff; }
-/* stop button style */
-.scroll-speed-btn.stop-btn.active { background: var(--surface2); color: var(--muted); }
+.scroll-btn:hover  { background: var(--border); color: var(--lyric-color); }
+.scroll-btn.active { background: var(--success, #4caf82); color: #fff; }
+.scroll-btn.stop.active { background: var(--surface2); color: var(--muted); }
+.scroll-px-display {
+  padding: 0 10px; font-family: var(--font-mono); font-size: 0.78rem;
+  color: var(--lyric-color); border-left: 1px solid var(--border);
+  min-width: 52px; text-align: center; user-select: none;
+}
 
 /* Scrolling indicator line at top of score */
 .scroll-progress {
@@ -380,22 +384,27 @@ body {
   <div class="app-logo">🎸 UkeScore</div>
   <div class="topbar-spacer"></div>
   <div class="toggle-group" id="dispToggle">
-    <button class="active" data-m="chord"  onclick="setMode('chord')">コード名</button>
-    <button             data-m="tab"    onclick="setMode('tab')">タブ譜</button>
-    <button             data-m="both"   onclick="setMode('both')">両方</button>
+    <button class="active" data-m="chord" onclick="setMode('chord')">コード名</button>
+    <button             data-m="tab"   onclick="setMode('tab')" style="display:none">タブ譜</button>
+    <button             data-m="both"  onclick="setMode('both')">両方</button>
   </div>
   <!-- Font size toggle -->
   <div class="toggle-group" id="fontToggle">
     <button class="active" data-f="normal" onclick="setFontSize('normal')">標準</button>
     <button             data-f="large"  onclick="setFontSize('large')">大</button>
   </div>
-  <!-- Auto-scroll speed selector -->
+  <!-- Auto-scroll control -->
   <div class="scroll-ctrl" id="scrollCtrl">
-    <span class="scroll-ctrl-label">🎵 自動スクロール</span>
-    <button class="scroll-speed-btn stop-btn active" data-speed="0"  onclick="setScrollSpeed(0)">■ 停止</button>
-    <button class="scroll-speed-btn"                 data-speed="1"  onclick="setScrollSpeed(1)">遅</button>
-    <button class="scroll-speed-btn"                 data-speed="2"  onclick="setScrollSpeed(2)">中</button>
-    <button class="scroll-speed-btn"                 data-speed="3"  onclick="setScrollSpeed(3)">速</button>
+    <span class="scroll-ctrl-label">🎵 スクロール</span>
+    <button class="scroll-btn stop active" id="scrollStopBtn" onclick="toggleScroll()">■ 停止</button>
+    <button class="scroll-btn" onclick="changeScrollPx(-1)">◀</button>
+    <div class="scroll-px-display" id="scrollPxDisp">0 px</div>
+    <button class="scroll-btn" onclick="changeScrollPx(+1)">▶</button>
+    <div class="toggle-group" id="intervalToggle" style="border-radius:0;border:none;border-left:1px solid var(--border)">
+      <button data-iv="200" onclick="setScrollInterval(200)">遅</button>
+      <button data-iv="100" class="active" onclick="setScrollInterval(100)">中</button>
+      <button data-iv="50"  onclick="setScrollInterval(50)">速</button>
+    </div>
   </div>
 </div>
 
@@ -661,7 +670,7 @@ function deleteSong(idx) {
 function loadSong(idx) {
   currentIdx = idx;
   stopScrollLoop();
-  setScrollSpeed(0);
+  updateScrollUI();
   const ss = document.getElementById('scoreScroll');
   if (ss) ss.scrollTop = 0;
   renderSongList();
@@ -755,37 +764,71 @@ function toggleSidebar() {
 }
 
 /* ── Auto-scroll ── */
-// px/sec for each speed level
-const SCROLL_SPEEDS = [0, 10, 20, 30];
-// interval(ms) = 1px ÷ (px/sec) × 1000  → always moves 1px per tick
-const SCROLL_INTERVALS = [0, 100, 50, 33]; // ms per 1px move
-let scrollSpeed = 0;
-let scrollTimer = null;
+const SCROLL_INTERVAL_DEFAULT = 100;
+let scrollInterval = SCROLL_INTERVAL_DEFAULT; // ms（変更可能）
+let scrollPx      = 0;
+let scrollRunning = false;
+let scrollTimer   = null;
 
-function setScrollSpeed(level) {
-  scrollSpeed = level;
-  document.querySelectorAll('.scroll-speed-btn').forEach(b => {
-    b.classList.toggle('active', +b.dataset.speed === level);
-  });
-  document.getElementById('scrollProgress').classList.toggle('running', level > 0);
-  level > 0 ? startScrollLoop() : stopScrollLoop();
+function setScrollInterval(ms) {
+  scrollInterval = ms;
+  document.querySelectorAll('#intervalToggle button').forEach(b =>
+    b.classList.toggle('active', +b.dataset.iv === ms));
+  // 実行中なら即座に再起動して新しい間隔を反映
+  if (scrollRunning) startScrollLoop();
+}
+
+function updateScrollUI() {
+  const disp    = document.getElementById('scrollPxDisp');
+  const stopBtn = document.getElementById('scrollStopBtn');
+  if (disp)    disp.textContent = scrollPx + ' px';
+  if (stopBtn) {
+    stopBtn.textContent = scrollRunning ? '■ 停止' : '▶ 再生';
+    stopBtn.classList.toggle('active', !scrollRunning);
+  }
+  document.getElementById('scrollProgress')
+    .classList.toggle('running', scrollRunning && scrollPx > 0);
+}
+
+function toggleScroll() {
+  if (scrollRunning) {
+    stopScrollLoop();
+  } else {
+    if (scrollPx === 0) scrollPx = 1; // 0のまま再生しようとしたら1に
+    startScrollLoop();
+  }
+  updateScrollUI();
+}
+
+function changeScrollPx(delta) {
+  scrollPx = Math.max(0, Math.min(100, scrollPx + delta));
+  if (scrollPx === 0 && scrollRunning) stopScrollLoop();
+  if (scrollPx > 0 && !scrollRunning)  startScrollLoop();
+  updateScrollUI();
 }
 
 function startScrollLoop() {
   stopScrollLoop();
+  scrollRunning = true;
   scrollTimer = setInterval(() => {
+    if (scrollPx === 0) return;
     const el = document.getElementById('scoreScroll');
     if (!el) return;
-    el.scrollTop += 1;  // always exactly 1px per tick
+    el.scrollTop += scrollPx;
     if (el.scrollTop + el.clientHeight >= el.scrollHeight - 4) {
-      setScrollSpeed(0);
+      stopScrollLoop();
+      updateScrollUI();
     }
-  }, SCROLL_INTERVALS[scrollSpeed]);
+  }, scrollInterval);
 }
 
 function stopScrollLoop() {
   if (scrollTimer) { clearInterval(scrollTimer); scrollTimer = null; }
+  scrollRunning = false;
 }
+
+// 旧API互換（loadSongから呼ばれる）
+function setScrollSpeed(level) { stopScrollLoop(); updateScrollUI(); }
 
 
 
@@ -1020,8 +1063,8 @@ if (!songs.find(s => s.title === "こりゃさの音頭")) {
 ;(function() {
   const ss = document.getElementById('scoreScroll');
   if (ss) {
-    ss.addEventListener('touchstart', () => { if (scrollSpeed > 0) setScrollSpeed(0); }, { passive: true });
-    ss.addEventListener('wheel',      () => { if (scrollSpeed > 0) setScrollSpeed(0); }, { passive: true });
+    ss.addEventListener('touchstart', () => { if (scrollRunning) { stopScrollLoop(); updateScrollUI(); } }, { passive: true });
+    ss.addEventListener('wheel',      () => { if (scrollRunning) { stopScrollLoop(); updateScrollUI(); } }, { passive: true });
   }
 })();
 </script>
