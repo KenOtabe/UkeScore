@@ -700,12 +700,12 @@ function renderChordBar(song) {
       Object.values(line.chords).forEach(c => { if (c) chords.add(c.trim()); })
     )
   );
-  const showTab = dispMode !== 'chord';
+  // 上部のコード一覧は「コード名」モードでも常にタブ譜も表示する
   document.getElementById('chordBar').innerHTML =
     [...chords].filter(Boolean).map(c => `
       <div class="cref">
         <div class="cref-name">${c}</div>
-        <div class="cref-tab ${showTab?'show':''}">${tabRefText(c)}</div>
+        <div class="cref-tab show">${tabRefText(c)}</div>
       </div>`).join('');
 }
 
